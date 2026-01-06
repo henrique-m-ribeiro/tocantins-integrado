@@ -9,14 +9,18 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 const N8N_WEBHOOK_URL = process.env.NEXT_PUBLIC_N8N_URL || '';
+// Permite configurar o path do webhook do orquestrador (pode ser /webhook/orchestrator ou UUID)
+const N8N_ORCHESTRATOR_PATH = process.env.NEXT_PUBLIC_N8N_ORCHESTRATOR_PATH || '/webhook/orchestrator';
 
 class ApiClient {
   private baseUrl: string;
   private n8nUrl: string;
+  private orchestratorPath: string;
 
-  constructor(baseUrl: string, n8nUrl: string) {
+  constructor(baseUrl: string, n8nUrl: string, orchestratorPath: string = N8N_ORCHESTRATOR_PATH) {
     this.baseUrl = baseUrl;
     this.n8nUrl = n8nUrl;
+    this.orchestratorPath = orchestratorPath;
   }
 
   private async request<T>(
@@ -296,6 +300,11 @@ class ApiClient {
   /**
    * Solicitar análise complexa via n8n
    * Retorna um ID de execução para acompanhamento
+   *
+   * O endpoint pode ser configurado via NEXT_PUBLIC_N8N_ORCHESTRATOR_PATH
+   * Exemplos:
+   *   - /webhook/orchestrator (padrão, requer configuração no n8n)
+   *   - /webhook/0268b424-b3a3-41ea-9448-c99a1340a0c2 (UUID gerado pelo n8n)
    */
   async requestComplexAnalysis(data: {
     query: string;
@@ -306,10 +315,14 @@ class ApiClient {
     };
   }) {
     if (!this.n8nUrl) {
-      throw new Error('n8n não configurado');
+      throw new Error('n8n não configurado. Configure NEXT_PUBLIC_N8N_URL no .env');
     }
 
-    const response = await fetch(`${this.n8nUrl}/webhook/orchestrator`, {
+    // Constrói a URL completa, normalizando barras
+    const baseUrl = this.n8nUrl.replace(/\/$/, '');
+    const path = this.orchestratorPath.startsWith('/') ? this.orchestratorPath : `/${this.orchestratorPath}`;
+
+    const response = await fetch(`${baseUrl}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
