@@ -1,7 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { X, MapPin, Users, Ruler, TrendingUp, Download, ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { X, MapPin, Users, Ruler, TrendingUp, Download, ChevronRight, FileText, Sparkles } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface MunicipalityPanelProps {
@@ -24,10 +25,26 @@ const DIMENSION_LABELS = {
 };
 
 export function MunicipalityPanel({ municipalityId, onClose }: MunicipalityPanelProps) {
+  const router = useRouter();
+
   // Buscar perfil do município
   const { data: profile, isLoading } = useQuery({
     queryKey: ['municipality-profile', municipalityId],
     queryFn: () => api.getMunicipalityProfile(municipalityId)
+  });
+
+  // Buscar fragmentos de análises
+  const { data: analysisFragments } = useQuery({
+    queryKey: ['municipality-fragments', municipalityId],
+    queryFn: () => api.getAnalysisFragments(municipalityId),
+    enabled: !!municipalityId
+  });
+
+  // Buscar análises disponíveis
+  const { data: analyses } = useQuery({
+    queryKey: ['municipality-analyses', municipalityId],
+    queryFn: () => api.getMunicipalityAnalyses(municipalityId),
+    enabled: !!municipalityId
   });
 
   if (isLoading) {
@@ -162,18 +179,89 @@ export function MunicipalityPanel({ municipalityId, onClose }: MunicipalityPanel
             </div>
           </div>
         )}
+
+        {/* Analysis Fragments - Insights rápidos */}
+        {analysisFragments && analysisFragments.length > 0 && (
+          <div className="px-4 pb-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-yellow-500" />
+              Destaques das Análises
+            </h3>
+
+            <div className="space-y-2">
+              {analysisFragments.slice(0, 3).map((fragment: any, i: number) => (
+                <div
+                  key={i}
+                  className="p-3 bg-gradient-to-r from-gray-50 to-white rounded-lg border border-gray-100"
+                >
+                  <span className="text-xs font-medium text-tocantins-blue uppercase">
+                    {fragment.dimension}
+                  </span>
+                  <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                    {fragment.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Available analyses */}
+        {analyses && analyses.length > 0 && (
+          <div className="px-4 pb-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Análises Disponíveis
+            </h3>
+
+            <div className="space-y-2">
+              {analyses.slice(0, 3).map((analysis: any) => (
+                <button
+                  key={analysis.id}
+                  onClick={() => router.push(`/analises/${analysis.slug}`)}
+                  className="w-full flex items-center justify-between p-2 text-left hover:bg-gray-50 rounded-lg transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate group-hover:text-tocantins-blue">
+                      {analysis.title}
+                    </p>
+                    <span className="text-xs text-gray-500">
+                      {analysis.data_year} • {analysis.analysis_type.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-tocantins-blue" />
+                </button>
+              ))}
+
+              {analyses.length > 3 && (
+                <button
+                  onClick={() => router.push(`/analises?municipio=${municipalityId}`)}
+                  className="w-full text-center text-sm text-tocantins-blue hover:underline py-1"
+                >
+                  Ver todas ({analyses.length})
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Actions */}
       <div className="p-4 border-t bg-gray-50 space-y-2">
-        <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-tocantins-blue text-white rounded-lg hover:bg-tocantins-blue/90 transition-colors">
+        <button
+          onClick={() => router.push(`/analises?municipio=${municipalityId}`)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-tocantins-blue text-white rounded-lg hover:bg-tocantins-blue/90 transition-colors"
+        >
           <TrendingUp className="h-4 w-4" />
-          <span>Ver análise completa</span>
+          <span>Ver análises completas</span>
         </button>
 
-        <button className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+        <button
+          onClick={() => router.push(`/documentos?municipio=${municipalityId}`)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+        >
           <Download className="h-4 w-4" />
-          <span>Exportar relatório</span>
+          <span>Baixar relatórios</span>
         </button>
       </div>
     </div>

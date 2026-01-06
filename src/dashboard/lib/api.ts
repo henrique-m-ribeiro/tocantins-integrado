@@ -1,14 +1,22 @@
 /**
- * Cliente API para o Dashboard
+ * Cliente API para o Dashboard Replit
+ * Tocantins Integrado - MVP v1.0
+ *
+ * Arquitetura:
+ * - Dashboard: Consultas rápidas + análises pré-computadas
+ * - n8n: Análises complexas sob demanda
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const N8N_WEBHOOK_URL = process.env.NEXT_PUBLIC_N8N_URL || '';
 
 class ApiClient {
   private baseUrl: string;
+  private n8nUrl: string;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, n8nUrl: string) {
     this.baseUrl = baseUrl;
+    this.n8nUrl = n8nUrl;
   }
 
   private async request<T>(
@@ -67,33 +75,6 @@ class ApiClient {
     }>(`/municipalities/${id}/profile`);
   }
 
-  async getMunicipalityIndicators(id: string, params?: {
-    dimension?: string;
-    year?: number;
-  }) {
-    const searchParams = new URLSearchParams();
-    if (params?.dimension) searchParams.set('dimension', params.dimension);
-    if (params?.year) searchParams.set('year', String(params.year));
-
-    const query = searchParams.toString();
-    return this.request<{
-      municipality_id: string;
-      total_indicators: number;
-      indicators_by_dimension: Record<string, any[]>;
-    }>(`/municipalities/${id}/indicators${query ? `?${query}` : ''}`);
-  }
-
-  async compareMunicipalities(ids: string[], dimension?: string) {
-    const searchParams = new URLSearchParams();
-    searchParams.set('ids', ids.join(','));
-    if (dimension) searchParams.set('dimension', dimension);
-
-    return this.request<{
-      municipalities: any[];
-      total_indicators: number;
-    }>(`/municipalities/compare?${searchParams.toString()}`);
-  }
-
   async getMicroregions() {
     return this.request<{
       count: number;
@@ -106,6 +87,131 @@ class ApiClient {
       type: string;
       features: any[];
     }>('/municipalities/geo/geojson');
+  }
+
+  // ==================
+  // Análises Pré-computadas
+  // ==================
+
+  /**
+   * Buscar análises publicadas de um município
+   */
+  async getMunicipalityAnalyses(municipalityId: string) {
+    const response = await this.request<{
+      analyses: any[];
+      fragments: any[];
+    }>(`/analyses/municipality/${municipalityId}`);
+
+    return response.analyses || [];
+  }
+
+  /**
+   * Buscar análise específica por slug
+   */
+  async getAnalysisBySlug(slug: string) {
+    return this.request<any>(`/analyses/${slug}`);
+  }
+
+  /**
+   * Buscar fragmentos de análise para exibição contextual
+   * Aceita municipalityId diretamente ou objeto de params
+   */
+  async getAnalysisFragments(
+    municipalityIdOrParams?: string | {
+      municipality_id?: string;
+      dimension?: string;
+      indicator_code?: string;
+      fragment_type?: string;
+    }
+  ) {
+    const searchParams = new URLSearchParams();
+
+    if (typeof municipalityIdOrParams === 'string') {
+      searchParams.set('municipality_id', municipalityIdOrParams);
+    } else if (municipalityIdOrParams) {
+      if (municipalityIdOrParams.municipality_id) searchParams.set('municipality_id', municipalityIdOrParams.municipality_id);
+      if (municipalityIdOrParams.dimension) searchParams.set('dimension', municipalityIdOrParams.dimension);
+      if (municipalityIdOrParams.indicator_code) searchParams.set('indicator_code', municipalityIdOrParams.indicator_code);
+      if (municipalityIdOrParams.fragment_type) searchParams.set('fragment_type', municipalityIdOrParams.fragment_type);
+    }
+
+    const query = searchParams.toString();
+    const response = await this.request<{
+      fragments: any[];
+    }>(`/analyses/fragments${query ? `?${query}` : ''}`);
+
+    return response.fragments || [];
+  }
+
+  /**
+   * Buscar análises recentes (para listagem e filtros)
+   */
+  async getRecentAnalyses(params?: {
+    type?: string;
+    year?: number;
+    municipality_id?: string;
+    limit?: number;
+  } | number) {
+    const searchParams = new URLSearchParams();
+
+    if (typeof params === 'number') {
+      searchParams.set('limit', String(params));
+    } else if (params) {
+      if (params.type) searchParams.set('type', params.type);
+      if (params.year) searchParams.set('year', String(params.year));
+      if (params.municipality_id) searchParams.set('municipality_id', params.municipality_id);
+      if (params.limit) searchParams.set('limit', String(params.limit));
+    }
+
+    const query = searchParams.toString();
+    const response = await this.request<{
+      analyses: any[];
+    }>(`/analyses/recent${query ? `?${query}` : ''}`);
+
+    return response.analyses || [];
+  }
+
+  /**
+   * Registrar download de análise
+   */
+  async registerDownload(analysisId: string) {
+    return this.request<{ success: boolean }>(`/analyses/${analysisId}/download`, {
+      method: 'POST'
+    });
+  }
+
+  // ==================
+  // Documentos PDF
+  // ==================
+
+  /**
+   * Listar documentos disponíveis para download
+   */
+  async getDocuments(params?: {
+    municipality_id?: string;
+    type?: string;
+    limit?: number;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.municipality_id) searchParams.set('municipality_id', params.municipality_id);
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+
+    const query = searchParams.toString();
+    const response = await this.request<{
+      documents: any[];
+    }>(`/documents${query ? `?${query}` : ''}`);
+
+    return response.documents || [];
+  }
+
+  /**
+   * Registrar download de documento
+   */
+  async registerDocumentDownload(documentId: string) {
+    return this.request<{ success: boolean }>(`/documents/${documentId}/download`, {
+      method: 'POST'
+    });
   }
 
   // ==================
@@ -129,48 +235,20 @@ class ApiClient {
     }>(`/indicators${query ? `?${query}` : ''}`);
   }
 
-  async getIndicatorCategories(dimension?: string) {
-    const query = dimension ? `?dimension=${dimension}` : '';
-    return this.request<{
-      count: number;
-      categories_by_dimension: Record<string, any[]>;
-    }>(`/indicators/categories${query}`);
-  }
-
-  async getIndicatorValues(code: string, params?: {
+  async getMunicipalityIndicators(municipalityId: string, params?: {
+    dimension?: string;
     year?: number;
-    microregion?: string;
-    limit?: number;
   }) {
     const searchParams = new URLSearchParams();
+    if (params?.dimension) searchParams.set('dimension', params.dimension);
     if (params?.year) searchParams.set('year', String(params.year));
-    if (params?.microregion) searchParams.set('microregion', params.microregion);
-    if (params?.limit) searchParams.set('limit', String(params.limit));
 
     const query = searchParams.toString();
     return this.request<{
-      indicator_code: string;
-      count: number;
-      values: any[];
-    }>(`/indicators/${code}/values${query ? `?${query}` : ''}`);
-  }
-
-  async getIndicatorRanking(code: string, params?: {
-    year?: number;
-    limit?: number;
-    order?: 'asc' | 'desc';
-  }) {
-    const searchParams = new URLSearchParams();
-    if (params?.year) searchParams.set('year', String(params.year));
-    if (params?.limit) searchParams.set('limit', String(params.limit));
-    if (params?.order) searchParams.set('order', params.order);
-
-    const query = searchParams.toString();
-    return this.request<{
-      indicator_code: string;
-      order: string;
-      ranking: any[];
-    }>(`/indicators/${code}/ranking${query ? `?${query}` : ''}`);
+      municipality_id: string;
+      total_indicators: number;
+      indicators_by_dimension: Record<string, any[]>;
+    }>(`/municipalities/${municipalityId}/indicators${query ? `?${query}` : ''}`);
   }
 
   async getDimensions() {
@@ -185,10 +263,14 @@ class ApiClient {
   }
 
   // ==================
-  // Chat
+  // Chat Local (Exploração Rápida)
   // ==================
 
-  async sendChatMessage(data: {
+  /**
+   * Chat simples para exploração de dados
+   * Usa análises pré-computadas e busca contextual
+   */
+  async sendExplorationChat(data: {
     session_id?: string;
     message: string;
     context?: {
@@ -200,11 +282,62 @@ class ApiClient {
       session_id: string;
       message: any;
       suggestions: string[];
-    }>('/chat', {
+      source: 'precomputed' | 'realtime';
+    }>('/chat/explore', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   }
+
+  // ==================
+  // n8n - Análises Complexas
+  // ==================
+
+  /**
+   * Solicitar análise complexa via n8n
+   * Retorna um ID de execução para acompanhamento
+   */
+  async requestComplexAnalysis(data: {
+    query: string;
+    context?: {
+      municipality_id?: string;
+      municipality_ids?: string[];
+      dimensions?: string[];
+    };
+  }) {
+    if (!this.n8nUrl) {
+      throw new Error('n8n não configurado');
+    }
+
+    const response = await fetch(`${this.n8nUrl}/webhook/orchestrator`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao solicitar análise complexa');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Verificar status de análise em andamento
+   */
+  async checkAnalysisStatus(executionId: string) {
+    return this.request<{
+      status: 'pending' | 'running' | 'completed' | 'error';
+      result?: any;
+      error?: string;
+    }>(`/analyses/status/${executionId}`);
+  }
+
+  // ==================
+  // Sessão e Feedback
+  // ==================
 
   async getChatSession(sessionId: string) {
     return this.request<{
@@ -213,63 +346,20 @@ class ApiClient {
     }>(`/chat/sessions/${sessionId}`);
   }
 
-  async sendFeedback(sessionId: string, data: {
-    message_id: string;
+  async sendFeedback(data: {
+    analysis_id?: string;
+    message_id?: string;
     rating?: number;
     feedback_text?: string;
     was_helpful?: boolean;
   }) {
     return this.request<{
       success: boolean;
-      feedback_id: string;
-    }>(`/chat/sessions/${sessionId}/feedback`, {
+    }>('/feedback', {
       method: 'POST',
       body: JSON.stringify(data)
     });
-  }
-
-  // ==================
-  // Exportação
-  // ==================
-
-  async exportAnalysis(data: {
-    municipality_id: string;
-    dimensions?: string[];
-    format?: 'pdf' | 'text';
-  }) {
-    const response = await fetch(`${this.baseUrl}/export/analysis`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-
-    if (!response.ok) {
-      throw new Error('Erro ao exportar análise');
-    }
-
-    return response.blob();
-  }
-
-  async exportComparison(data: {
-    municipality_ids: string[];
-    format?: 'pdf' | 'text';
-  }) {
-    const response = await fetch(`${this.baseUrl}/export/comparison`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-
-    if (!response.ok) {
-      throw new Error('Erro ao exportar comparação');
-    }
-
-    return response.blob();
   }
 }
 
-export const api = new ApiClient(API_BASE_URL);
+export const api = new ApiClient(API_BASE_URL, N8N_WEBHOOK_URL);

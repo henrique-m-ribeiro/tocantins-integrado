@@ -1,0 +1,441 @@
+{
+  "name": "Tocantins Integrado - Orquestrador",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "orchestrator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-turbo-preview",
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.system_prompt }}",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.query }}",
+              "role": "user"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.2,
+          "responseFormat": "json_object"
+        }
+      },
+      "id": "classify-query",
+      "name": "Classificar Consulta",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [440, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear resposta do classificador\nconst classification = JSON.parse($input.first().json.message.content);\n\n// Determinar quais agentes chamar\nconst agentsToCall = classification.dimensions || ['ECON', 'SOCIAL'];\nconst queryType = classification.query_type || 'free_query';\nconst entities = classification.entities || {};\n\nreturn {\n  classification,\n  agentsToCall,\n  queryType,\n  entities,\n  originalQuery: $('Webhook Trigger').first().json.query,\n  context: $('Webhook Trigger').first().json.context || {}\n};"
+      },
+      "id": "parse-classification",
+      "name": "Processar Classificação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 4,
+        "options": {}
+      },
+      "id": "split-agents",
+      "name": "Dividir por Agente",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "econ",
+              "leftValue": "={{ $json.agent }}",
+              "rightValue": "ECON",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "social",
+              "leftValue": "={{ $json.agent }}",
+              "rightValue": "SOCIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "terra",
+              "leftValue": "={{ $json.agent }}",
+              "rightValue": "TERRA",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "ambient",
+              "leftValue": "={{ $json.agent }}",
+              "rightValue": "AMBIENT",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "route-to-agent",
+      "name": "Rotear para Agente",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_BASE_URL }}/webhook/agent-econ",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "task",
+              "value": "={{ $json.task }}"
+            },
+            {
+              "name": "context",
+              "value": "={{ JSON.stringify($json.context) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "call-agent-econ",
+      "name": "Chamar Agente ECON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1320, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_BASE_URL }}/webhook/agent-social",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "task",
+              "value": "={{ $json.task }}"
+            },
+            {
+              "name": "context",
+              "value": "={{ JSON.stringify($json.context) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "call-agent-social",
+      "name": "Chamar Agente SOCIAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1320, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_BASE_URL }}/webhook/agent-terra",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "task",
+              "value": "={{ $json.task }}"
+            },
+            {
+              "name": "context",
+              "value": "={{ JSON.stringify($json.context) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "call-agent-terra",
+      "name": "Chamar Agente TERRA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1320, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_BASE_URL }}/webhook/agent-ambient",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "task",
+              "value": "={{ $json.task }}"
+            },
+            {
+              "name": "context",
+              "value": "={{ JSON.stringify($json.context) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "call-agent-ambient",
+      "name": "Chamar Agente AMBIENT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1320, 520]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByFields": {
+          "values": []
+        },
+        "options": {}
+      },
+      "id": "merge-responses",
+      "name": "Consolidar Respostas",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-turbo-preview",
+        "messages": {
+          "values": [
+            {
+              "content": "Você é um especialista em consolidar análises territoriais. Sua tarefa é sintetizar as análises dos agentes especialistas em uma resposta coesa e útil.",
+              "role": "system"
+            },
+            {
+              "content": "Consulta original: {{ $json.originalQuery }}\n\nRespostas dos agentes:\n{{ $json.agentResponses }}\n\nPor favor, consolide em uma resposta integrada.",
+              "role": "user"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "consolidate-llm",
+      "name": "Consolidar com LLM",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [1760, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'success', response: $json.consolidatedResponse, agents_used: $json.agentsUsed, processing_time_ms: Date.now() - $json.startTime }) }}"
+      },
+      "id": "respond-webhook",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1980, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Classificar Consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classificar Consulta": {
+      "main": [
+        [
+          {
+            "node": "Processar Classificação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Classificação": {
+      "main": [
+        [
+          {
+            "node": "Dividir por Agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dividir por Agente": {
+      "main": [
+        [
+          {
+            "node": "Rotear para Agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rotear para Agente": {
+      "main": [
+        [
+          {
+            "node": "Chamar Agente ECON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chamar Agente SOCIAL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chamar Agente TERRA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chamar Agente AMBIENT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Agente ECON": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Respostas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Agente SOCIAL": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Respostas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Agente TERRA": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Respostas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Agente AMBIENT": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Respostas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidar Respostas": {
+      "main": [
+        [
+          {
+            "node": "Consolidar com LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidar com LLM": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "tocantins-integrado"
+    },
+    {
+      "name": "orchestrator"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-06T00:00:00.000Z",
+  "versionId": "1"
+}

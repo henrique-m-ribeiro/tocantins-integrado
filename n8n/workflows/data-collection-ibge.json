@@ -1,0 +1,338 @@
+{
+  "name": "Tocantins Integrado - Coleta de Dados IBGE",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3,
+              "daysInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Agendamento Mensal",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, code, name, base_url, api_type FROM data_sources WHERE code = 'IBGE_SIDRA' AND is_active = true",
+        "options": {}
+      },
+      "id": "get-source-config",
+      "name": "Buscar Config Fonte",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "collection_jobs",
+        "columns": "data_source_id, job_type, status, started_at",
+        "returnFields": "id",
+        "options": {}
+      },
+      "id": "create-job",
+      "name": "Criar Job de Coleta",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [660, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT ibge_code, name FROM municipalities ORDER BY name",
+        "options": {}
+      },
+      "id": "get-municipalities",
+      "name": "Listar Municípios",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [880, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "batch-municipalities",
+      "name": "Processar em Lotes",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://apisidra.ibge.gov.br/values/t/5938/n6/{{ $json.ibge_code }}/v/allxp/p/last/d/v37%202",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "fetch-pib-data",
+      "name": "Buscar PIB Municipal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "url": "=https://apisidra.ibge.gov.br/values/t/6579/n6/{{ $json.ibge_code }}/v/allxp/p/last",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "fetch-population-data",
+      "name": "Buscar População",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1320, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar dados do IBGE e formatar para inserção\nconst pibData = $('Buscar PIB Municipal').all();\nconst popData = $('Buscar População').all();\nconst municipality = $input.first().json;\n\nconst records = [];\n\n// Processar PIB\nif (pibData.length > 0) {\n  const pib = pibData[0].json;\n  if (pib && pib.V) {\n    records.push({\n      indicator_code: 'ECON_PIB_TOTAL',\n      municipality_ibge: municipality.ibge_code,\n      year: parseInt(pib.D1N) || new Date().getFullYear() - 1,\n      value: parseFloat(pib.V.replace(',', '.')) || 0\n    });\n  }\n}\n\n// Processar População\nif (popData.length > 0) {\n  const pop = popData[0].json;\n  if (pop && pop.V) {\n    records.push({\n      indicator_code: 'SOCIAL_POPULACAO',\n      municipality_ibge: municipality.ibge_code,\n      year: parseInt(pop.D1N) || new Date().getFullYear(),\n      value: parseFloat(pop.V.replace(',', '.')) || 0\n    });\n  }\n}\n\nreturn records;"
+      },
+      "id": "process-data",
+      "name": "Processar Dados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO indicator_values (indicator_id, municipality_id, year, value)\nSELECT \n  id.id,\n  m.id,\n  $3::integer,\n  $4::decimal\nFROM indicator_definitions id, municipalities m\nWHERE id.code = $1 AND m.ibge_code = $2\nON CONFLICT (indicator_id, municipality_id, year, month) \nDO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+        "options": {}
+      },
+      "id": "upsert-indicators",
+      "name": "Inserir/Atualizar Indicadores",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [1760, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "collection_logs",
+        "columns": "job_id, log_level, message, details",
+        "options": {}
+      },
+      "id": "log-progress",
+      "name": "Registrar Progresso",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [1760, 480],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "collection_jobs",
+        "columns": "status, completed_at, records_collected",
+        "updateKey": "id",
+        "options": {}
+      },
+      "id": "finalize-job",
+      "name": "Finalizar Job",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [1980, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "data_sources",
+        "columns": "last_collection_at",
+        "updateKey": "id",
+        "options": {}
+      },
+      "id": "update-source",
+      "name": "Atualizar Fonte",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [2200, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Agendamento Mensal": {
+      "main": [
+        [
+          {
+            "node": "Buscar Config Fonte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Config Fonte": {
+      "main": [
+        [
+          {
+            "node": "Criar Job de Coleta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Job de Coleta": {
+      "main": [
+        [
+          {
+            "node": "Listar Municípios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar Municípios": {
+      "main": [
+        [
+          {
+            "node": "Processar em Lotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar em Lotes": {
+      "main": [
+        [
+          {
+            "node": "Buscar PIB Municipal",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Buscar População",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar PIB Municipal": {
+      "main": [
+        [
+          {
+            "node": "Processar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar População": {
+      "main": [
+        [
+          {
+            "node": "Processar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Dados": {
+      "main": [
+        [
+          {
+            "node": "Inserir/Atualizar Indicadores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserir/Atualizar Indicadores": {
+      "main": [
+        [
+          {
+            "node": "Registrar Progresso",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Finalizar Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalizar Job": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Fonte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "tocantins-integrado"
+    },
+    {
+      "name": "data-collection"
+    },
+    {
+      "name": "ibge"
+    }
+  ]
+}

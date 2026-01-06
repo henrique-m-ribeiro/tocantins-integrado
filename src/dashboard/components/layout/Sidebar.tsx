@@ -1,9 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Search, MapPin, ChevronRight, X, Filter } from 'lucide-react';
+import { Search, MapPin, ChevronRight, X, Filter, Map, FileText, Download, Home } from 'lucide-react';
 import { api } from '@/lib/api';
+
+const NAV_ITEMS = [
+  { href: '/', label: 'Mapa', icon: Map },
+  { href: '/analises', label: 'Análises', icon: FileText },
+  { href: '/documentos', label: 'Documentos', icon: Download },
+];
 
 interface SidebarProps {
   isOpen: boolean;
@@ -18,6 +25,8 @@ export function Sidebar({
   selectedMunicipality,
   onSelectMunicipality
 }: SidebarProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [search, setSearch] = useState('');
   const [selectedMicroregion, setSelectedMicroregion] = useState<string | null>(null);
 
@@ -43,17 +52,42 @@ export function Sidebar({
 
   return (
     <aside className="w-80 bg-white border-r flex flex-col shadow-lg">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Municípios</h2>
+      {/* Navigation */}
+      <div className="p-3 border-b bg-gray-50">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-500 uppercase">Navegação</span>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded lg:hidden"
+            className="p-1 hover:bg-gray-200 rounded lg:hidden"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
+        <nav className="flex gap-1">
+          {NAV_ITEMS.map(item => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <button
+                key={item.href}
+                onClick={() => router.push(item.href)}
+                className={`flex-1 flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-tocantins-blue text-white'
+                    : 'hover:bg-gray-200 text-gray-600'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="text-xs font-medium">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Header */}
+      <div className="p-4 border-b">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Municípios</h2>
 
         {/* Search */}
         <div className="relative">
