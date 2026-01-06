@@ -96,11 +96,59 @@ Os diários de pesquisa-ação estão disponíveis em [`docs/01-research/diaries
 
 ## 🚀 Quick Start
 
-> **Em construção** - O MVP está em fase de desenvolvimento estruturado.
+### Pré-requisitos
 
-Para acompanhar o progresso, consulte:
+- Node.js 20+
+- npm ou yarn
+- Conta no Supabase (para banco de dados)
+- Chave da API OpenAI
+
+### Instalação
+
+```bash
+# Clone o repositório
+git clone https://github.com/henrique-m-ribeiro/tocantins-integrado.git
+cd tocantins-integrado
+
+# Instale as dependências
+npm install
+
+# Configure as variáveis de ambiente
+cp .env.example .env
+# Edite o .env com suas credenciais
+
+# Execute as migrations do banco de dados
+npm run db:migrate
+
+# Popule o banco com dados iniciais
+npm run db:seed
+```
+
+### Executando o Projeto
+
+```bash
+# Inicie o servidor de desenvolvimento (API + Dashboard)
+npm run dev
+
+# Ou execute separadamente:
+npm run dev:api       # API na porta 3001
+npm run dev:dashboard # Dashboard na porta 3000
+```
+
+### Estrutura dos Comandos
+
+| Comando | Descrição |
+| :--- | :--- |
+| `npm run dev` | Inicia API e Dashboard em paralelo |
+| `npm run dev:api` | Inicia apenas a API (porta 3001) |
+| `npm run dev:dashboard` | Inicia apenas o Dashboard (porta 3000) |
+| `npm run db:migrate` | Executa migrations do banco |
+| `npm run db:seed` | Popula banco com dados iniciais |
+| `npm run test` | Executa testes |
+| `npm run build` | Build de produção |
+
+Para mais detalhes, consulte:
 - [PRD (Product Requirements Document)](docs/00-project/PRD.md)
-- [Roadmap](docs/00-project/ROADMAP.md)
 
 ## 🛠️ Stack Tecnológica
 
