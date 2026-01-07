@@ -39,6 +39,7 @@ data/processed/*.json
 tmp/
 temp/
 *.tmp
+output/
 
 # Secrets
 *.pem
