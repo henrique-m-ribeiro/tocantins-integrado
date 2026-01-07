@@ -30,7 +30,7 @@ const SIDRA_TABLES = {
 const SIDRA_VARIABLES = {
   PIB_TOTAL: '37',           // PIB a preços correntes (R$ 1.000)
   PIB_PER_CAPITA: '513',     // PIB per capita (R$)
-  POPULACAO: '93',           // População residente
+  POPULACAO: '9324',         // População residente estimada
   VAB_AGRO: '517',           // VAB Agropecuária
   VAB_INDUSTRIA: '518',      // VAB Indústria
   VAB_SERVICOS: '519',       // VAB Serviços
@@ -70,9 +70,10 @@ export class IBGESidraCollector extends BaseCollector {
     municipalities?: string[]
   ): string {
     // n6 = nível municipal, usando código do estado para pegar todos os municípios
+    // IMPORTANTE: Espaços devem ser codificados como %20 na URL
     const municipalityParam = municipalities
       ? municipalities.join(',')
-      : `in n3 ${TOCANTINS_STATE_CODE}`; // Todos do Tocantins
+      : `in%20n3%20${TOCANTINS_STATE_CODE}`; // Todos do Tocantins (URL encoded)
 
     const url = `${this.config.baseUrl}/t/${table}/n6/${municipalityParam}/v/${variables.join(',')}/p/${years.join(',')}`;
 
@@ -128,8 +129,8 @@ export class IBGESidraCollector extends BaseCollector {
 
       for (const record of records) {
         const municipalityCode = record['D1C']; // Código do município
-        const year = parseInt(record['D2C']); // Ano
-        const variableCode = record['D3C']; // Código da variável
+        const variableCode = record['D2C']; // Código da variável
+        const year = parseInt(record['D3C']); // Ano
         const value = this.parseNumber(record['V']); // Valor
 
         if (!municipalityCode || !year) continue;
@@ -187,9 +188,9 @@ export class IBGESidraCollector extends BaseCollector {
       this.log(`Recebidos ${records.length} registros de População`);
 
       for (const record of records) {
-        const municipalityCode = record['D1C'];
-        const year = parseInt(record['D2C']);
-        const value = this.parseNumber(record['V']);
+        const municipalityCode = record['D1C']; // Código do município
+        const year = parseInt(record['D3C']); // Ano (D3C, não D2C)
+        const value = this.parseNumber(record['V']); // Valor
 
         if (!municipalityCode || !year) continue;
 
@@ -234,10 +235,10 @@ export class IBGESidraCollector extends BaseCollector {
       const records = data.slice(1);
 
       for (const record of records) {
-        const municipalityCode = record['D1C'];
-        const year = parseInt(record['D2C']);
-        const variableCode = record['D3C'];
-        let value = this.parseNumber(record['V']);
+        const municipalityCode = record['D1C']; // Código do município
+        const variableCode = record['D2C']; // Código da variável
+        const year = parseInt(record['D3C']); // Ano
+        let value = this.parseNumber(record['V']); // Valor
 
         if (!municipalityCode || !year) continue;
 

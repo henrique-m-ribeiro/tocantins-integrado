@@ -156,8 +156,8 @@ export class SICONFICollector extends BaseCollector {
 
     try {
       // Endpoint para receitas orçamentárias
-      // /dca_orcamentaria?an_exercicio=2022&no_anexo=DCA-Anexo%20I-C&id_ente=...
-      const baseUrl = `${this.config.baseUrl}/dca_orcamentaria`;
+      // /dca?an_exercicio=2022&no_anexo=DCA-Anexo%20I-C&id_ente=...
+      const baseUrl = `${this.config.baseUrl}/dca`;
 
       for (const muni of this.getMunicipalities()) {
         try {
@@ -211,7 +211,7 @@ export class SICONFICollector extends BaseCollector {
     this.log(`Coletando despesas ${year}...`);
 
     try {
-      const baseUrl = `${this.config.baseUrl}/dca_orcamentaria`;
+      const baseUrl = `${this.config.baseUrl}/dca`;
 
       for (const muni of this.getMunicipalities()) {
         try {
@@ -482,7 +482,7 @@ export class SICONFICollector extends BaseCollector {
     for (const year of availableYears) {
       try {
         // Receitas via DCA
-        const receitasUrl = `${this.config.baseUrl}/dca_orcamentaria?an_exercicio=${year}&no_anexo=DCA-Anexo%20I-C&id_ente=${ibgeCode}`;
+        const receitasUrl = `${this.config.baseUrl}/dca?an_exercicio=${year}&no_anexo=DCA-Anexo%20I-C&id_ente=${ibgeCode}`;
 
         try {
           const response = await this.fetchJson<SiconfiResponse>(receitasUrl);
@@ -496,7 +496,7 @@ export class SICONFICollector extends BaseCollector {
         }
 
         // Despesas via DCA
-        const despesasUrl = `${this.config.baseUrl}/dca_orcamentaria?an_exercicio=${year}&no_anexo=DCA-Anexo%20I-E&id_ente=${ibgeCode}`;
+        const despesasUrl = `${this.config.baseUrl}/dca?an_exercicio=${year}&no_anexo=DCA-Anexo%20I-E&id_ente=${ibgeCode}`;
 
         try {
           const response = await this.fetchJson<SiconfiResponse>(despesasUrl);
