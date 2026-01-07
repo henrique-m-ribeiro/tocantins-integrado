@@ -1,0 +1,241 @@
+{
+  "name": "Data Collection - Initial Load",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "dc001-start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configuração da coleta inicial\nconst config = {\n  years: [2019, 2020, 2021, 2022, 2023],\n  collectors: [\n    { name: 'IBGE Sidra', priority: 1, endpoint: 'ibge-sidra' },\n    { name: 'MapBiomas', priority: 1, endpoint: 'mapbiomas' },\n    { name: 'SICONFI', priority: 1, endpoint: 'siconfi' },\n    { name: 'Atlas Brasil', priority: 2, endpoint: 'atlas-brasil' },\n    { name: 'INEP', priority: 2, endpoint: 'inep' },\n    { name: 'Comex Stat', priority: 2, endpoint: 'comex-stat' },\n    { name: 'DataSUS', priority: 3, endpoint: 'datasus' },\n    { name: 'SNIS', priority: 3, endpoint: 'snis' }\n  ],\n  batchSize: 20, // Municípios por batch\n  totalMunicipalities: 139\n};\n\n// Gerar batches de municípios\nconst batches = Math.ceil(config.totalMunicipalities / config.batchSize);\n\nreturn {\n  config,\n  batches,\n  startTime: new Date().toISOString(),\n  status: 'initialized'\n};"
+      },
+      "id": "dc001-config",
+      "name": "Setup Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": true,
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "dc001-check",
+      "name": "Pre-flight Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar coletores por prioridade\nconst input = $input.first().json;\nconst collectors = input.config.collectors;\n\n// Ordenar por prioridade\nconst sortedCollectors = collectors.sort((a, b) => a.priority - b.priority);\n\n// Retornar cada coletor como item separado\nreturn sortedCollectors.map(collector => ({\n  json: {\n    collector,\n    years: input.config.years,\n    batchSize: input.config.batchSize,\n    startTime: input.startTime\n  }\n}));"
+      },
+      "id": "dc001-split",
+      "name": "Split by Collector",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.COLLECTOR_SERVICE_URL }}/collect",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"collector\": \"{{ $json.collector.endpoint }}\",\n  \"years\": {{ JSON.stringify($json.years) }},\n  \"municipalities\": \"all\",\n  \"batchSize\": {{ $json.batchSize }}\n}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "dc001-collect",
+      "name": "Execute Collector",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agregar resultados de todos os coletores\nconst results = $input.all();\n\nconst summary = {\n  totalCollectors: results.length,\n  successful: 0,\n  failed: 0,\n  totalRecords: 0,\n  byCollector: [],\n  errors: []\n};\n\nfor (const result of results) {\n  const data = result.json;\n  \n  if (data.error) {\n    summary.failed++;\n    summary.errors.push({\n      collector: data.collector?.name || 'unknown',\n      error: data.error\n    });\n  } else {\n    summary.successful++;\n    summary.totalRecords += data.recordsCollected || 0;\n    summary.byCollector.push({\n      name: data.collector?.name || 'unknown',\n      records: data.recordsCollected || 0,\n      duration: data.duration || 0\n    });\n  }\n}\n\nsummary.completedAt = new Date().toISOString();\nsummary.status = summary.failed === 0 ? 'success' : 'partial';\n\nreturn summary;"
+      },
+      "id": "dc001-aggregate",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "collection_logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "collection_type": "initial",
+            "started_at": "={{ $('Setup Configuration').item.json.startTime }}",
+            "completed_at": "={{ $json.completedAt }}",
+            "status": "={{ $json.status }}",
+            "total_records": "={{ $json.totalRecords }}",
+            "collectors_run": "={{ $json.totalCollectors }}",
+            "collectors_success": "={{ $json.successful }}",
+            "collectors_failed": "={{ $json.failed }}",
+            "summary": "={{ JSON.stringify($json) }}"
+          }
+        }
+      },
+      "id": "dc001-log",
+      "name": "Log to Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1560, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-supabase",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equals",
+              "value2": "success"
+            }
+          ]
+        }
+      },
+      "id": "dc001-check-success",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "channel": "#data-collection",
+        "text": "=✅ *Coleta Inicial Concluída*\n\n📊 *Resumo:*\n• Total de registros: {{ $json.totalRecords }}\n• Coletores executados: {{ $json.totalCollectors }}\n• Sucesso: {{ $json.successful }}\n• Falhas: {{ $json.failed }}\n\n⏱️ Início: {{ $('Setup Configuration').item.json.startTime }}\n⏱️ Fim: {{ $json.completedAt }}",
+        "otherOptions": {}
+      },
+      "id": "dc001-notify-success",
+      "name": "Notify Success",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [2000, 100],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-webhook",
+          "name": "Slack Webhook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#data-collection",
+        "text": "=⚠️ *Coleta Inicial com Erros*\n\n📊 *Resumo:*\n• Total de registros: {{ $json.totalRecords }}\n• Coletores executados: {{ $json.totalCollectors }}\n• Sucesso: {{ $json.successful }}\n• Falhas: {{ $json.failed }}\n\n❌ *Erros:*\n{{ $json.errors.map(e => `• ${e.collector}: ${e.error}`).join('\\n') }}\n\n⏱️ Início: {{ $('Setup Configuration').item.json.startTime }}\n⏱️ Fim: {{ $json.completedAt }}",
+        "otherOptions": {}
+      },
+      "id": "dc001-notify-error",
+      "name": "Notify Errors",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [2000, 300],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-webhook",
+          "name": "Slack Webhook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "dc001-respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 400]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [{ "node": "Setup Configuration", "type": "main", "index": 0 }]
+      ]
+    },
+    "Setup Configuration": {
+      "main": [
+        [{ "node": "Pre-flight Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Pre-flight Check": {
+      "main": [
+        [{ "node": "Split by Collector", "type": "main", "index": 0 }],
+        [{ "node": "Respond Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split by Collector": {
+      "main": [
+        [{ "node": "Execute Collector", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute Collector": {
+      "main": [
+        [{ "node": "Aggregate Results", "type": "main", "index": 0 }]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [{ "node": "Log to Database", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log to Database": {
+      "main": [
+        [{ "node": "Check Success", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Success": {
+      "main": [
+        [{ "node": "Notify Success", "type": "main", "index": 0 }],
+        [{ "node": "Notify Errors", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "1",
+  "triggerCount": 0,
+  "tags": [
+    { "name": "data-collection" },
+    { "name": "initial-load" }
+  ]
+}

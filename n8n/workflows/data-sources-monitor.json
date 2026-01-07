@@ -1,0 +1,236 @@
+{
+  "name": "Data Sources Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "dsm001-cron",
+      "name": "Weekly Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Executa toda segunda-feira às 9h"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lista de fontes de dados para monitorar\nconst sources = [\n  {\n    name: 'IBGE Sidra',\n    healthUrl: 'https://apisidra.ibge.gov.br/values/t/6579/n1/all/v/93/p/last%201',\n    type: 'api',\n    expectedStatusCode: 200,\n    checkContent: true,\n    contentCheck: 'array_length > 0'\n  },\n  {\n    name: 'SICONFI/Tesouro',\n    healthUrl: 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt/entes?sg_uf=TO&co_esfera=M',\n    type: 'api',\n    expectedStatusCode: 200,\n    checkContent: true,\n    contentCheck: 'items.length > 0'\n  },\n  {\n    name: 'MapBiomas',\n    healthUrl: 'https://brasil.mapbiomas.org/',\n    type: 'website',\n    expectedStatusCode: 200\n  },\n  {\n    name: 'DataSUS TabNet',\n    healthUrl: 'http://tabnet.datasus.gov.br/cgi/deftohtm.exe?sim/cnv/inf10to.def',\n    type: 'website',\n    expectedStatusCode: 200\n  },\n  {\n    name: 'INEP',\n    healthUrl: 'https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/indicadores-educacionais/ideb',\n    type: 'website',\n    expectedStatusCode: 200\n  },\n  {\n    name: 'SNIS',\n    healthUrl: 'http://app4.mdr.gov.br/serieHistorica/',\n    type: 'website',\n    expectedStatusCode: 200\n  },\n  {\n    name: 'Comex Stat',\n    healthUrl: 'http://comexstat.mdic.gov.br/pt/home',\n    type: 'website',\n    expectedStatusCode: 200\n  },\n  {\n    name: 'Atlas Brasil',\n    healthUrl: 'http://www.atlasbrasil.org.br/',\n    type: 'website',\n    expectedStatusCode: 200\n  },\n  {\n    name: 'TerraBrasilis (PRODES)',\n    healthUrl: 'http://terrabrasilis.dpi.inpe.br/app/dashboard/deforestation/biomes/legal_amazon/increments',\n    type: 'website',\n    expectedStatusCode: 200\n  },\n  {\n    name: 'BDQueimadas (INPE)',\n    healthUrl: 'https://queimadas.dgi.inpe.br/queimadas/bdqueimadas/',\n    type: 'website',\n    expectedStatusCode: 200\n  }\n];\n\nreturn sources.map(source => ({ json: source }));"
+      },
+      "id": "dsm001-sources",
+      "name": "List Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.healthUrl }}",
+        "options": {
+          "timeout": 30000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 3
+            }
+          }
+        }
+      },
+      "id": "dsm001-check",
+      "name": "Check Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar resultado do health check\nconst input = $input.first();\nconst source = input.json;\n\nlet status = 'unknown';\nlet message = '';\nlet responseTime = 0;\n\ntry {\n  // Verificar se a requisição foi bem sucedida\n  if (source.error) {\n    status = 'error';\n    message = source.error.message || 'Erro desconhecido';\n  } else if (source.statusCode) {\n    responseTime = source.responseTime || 0;\n    \n    if (source.statusCode === 200) {\n      status = 'healthy';\n      message = 'API respondendo normalmente';\n      \n      // Verificar conteúdo se necessário\n      if (source.checkContent && source.contentCheck) {\n        // Verificação básica de conteúdo\n        const body = source.body || source.data;\n        if (Array.isArray(body) && source.contentCheck.includes('array_length')) {\n          if (body.length === 0) {\n            status = 'warning';\n            message = 'API respondendo mas sem dados';\n          }\n        }\n      }\n    } else if (source.statusCode >= 500) {\n      status = 'error';\n      message = `Erro do servidor (HTTP ${source.statusCode})`;\n    } else if (source.statusCode >= 400) {\n      status = 'warning';\n      message = `Erro de cliente (HTTP ${source.statusCode})`;\n    } else {\n      status = 'warning';\n      message = `Status inesperado (HTTP ${source.statusCode})`;\n    }\n  }\n} catch (e) {\n  status = 'error';\n  message = e.message;\n}\n\nreturn {\n  name: source.name || 'Unknown',\n  type: source.type || 'unknown',\n  url: source.healthUrl || '',\n  status,\n  message,\n  responseTime,\n  checkedAt: new Date().toISOString()\n};"
+      },
+      "id": "dsm001-process",
+      "name": "Process Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agregar todos os resultados de monitoramento\nconst results = $input.all();\n\nconst summary = {\n  totalSources: results.length,\n  healthy: 0,\n  warning: 0,\n  error: 0,\n  unknown: 0,\n  sources: [],\n  alerts: []\n};\n\nfor (const r of results) {\n  const data = r.json;\n  \n  summary[data.status]++;\n  summary.sources.push(data);\n  \n  if (data.status === 'error') {\n    summary.alerts.push({\n      severity: 'error',\n      source: data.name,\n      message: data.message\n    });\n  } else if (data.status === 'warning') {\n    summary.alerts.push({\n      severity: 'warning',\n      source: data.name,\n      message: data.message\n    });\n  }\n}\n\nsummary.checkedAt = new Date().toISOString();\nsummary.overallStatus = summary.error > 0 ? 'critical' : summary.warning > 0 ? 'degraded' : 'healthy';\n\nreturn summary;"
+      },
+      "id": "dsm001-aggregate",
+      "name": "Aggregate Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "source_health_logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "checked_at": "={{ $json.checkedAt }}",
+            "total_sources": "={{ $json.totalSources }}",
+            "healthy_count": "={{ $json.healthy }}",
+            "warning_count": "={{ $json.warning }}",
+            "error_count": "={{ $json.error }}",
+            "overall_status": "={{ $json.overallStatus }}",
+            "details": "={{ JSON.stringify($json) }}"
+          }
+        }
+      },
+      "id": "dsm001-log",
+      "name": "Log to Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-supabase",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.overallStatus }}",
+              "operation": "notEquals",
+              "value2": "healthy"
+            }
+          ]
+        }
+      },
+      "id": "dsm001-check-alerts",
+      "name": "Has Alerts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#data-collection",
+        "text": "=🔴 *Alerta: Fontes de Dados com Problemas*\n\n📊 *Status Geral:* {{ $json.overallStatus === 'critical' ? '❌ CRÍTICO' : '⚠️ DEGRADADO' }}\n\n📈 *Resumo:*\n• Total de fontes: {{ $json.totalSources }}\n• ✅ Saudáveis: {{ $json.healthy }}\n• ⚠️ Alertas: {{ $json.warning }}\n• ❌ Erros: {{ $json.error }}\n\n🚨 *Problemas Detectados:*\n{{ $json.alerts.map(a => `${a.severity === 'error' ? '❌' : '⚠️'} *${a.source}*: ${a.message}`).join('\\n') }}\n\n🕐 Verificado em: {{ $json.checkedAt }}",
+        "otherOptions": {}
+      },
+      "id": "dsm001-notify-alert",
+      "name": "Send Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1780, 200],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-webhook",
+          "name": "Slack Webhook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Todas as fontes estão saudáveis\nconst input = $input.first().json;\n\n// Log apenas - não notifica se tudo está OK\nconsole.log(`Monitoramento concluído: ${input.healthy}/${input.totalSources} fontes saudáveis`);\n\nreturn {\n  status: 'healthy',\n  message: `Todas as ${input.totalSources} fontes estão operacionais`,\n  checkedAt: input.checkedAt\n};"
+      },
+      "id": "dsm001-healthy",
+      "name": "All Healthy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 400]
+    },
+    {
+      "parameters": {},
+      "id": "dsm001-webhook",
+      "name": "Manual Check",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 500],
+      "webhookId": "sources-health-check"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verificar se há novas versões de dados disponíveis\n// Esta verificação é feita comparando metadados conhecidos\n\nconst versionChecks = [\n  {\n    name: 'MapBiomas Collection',\n    checkUrl: 'https://brasil.mapbiomas.org/',\n    currentVersion: 'Coleção 8',\n    searchPattern: 'Coleção \\\\d+'\n  },\n  {\n    name: 'PRODES',\n    checkUrl: 'http://terrabrasilis.dpi.inpe.br/',\n    currentVersion: '2023',\n    searchPattern: '\\\\d{4}'\n  },\n  {\n    name: 'Censo IBGE',\n    checkUrl: 'https://www.ibge.gov.br/estatisticas/sociais/populacao/',\n    currentVersion: '2022',\n    searchPattern: 'Censo \\\\d{4}'\n  }\n];\n\n// Em produção, faria scraping das páginas para verificar versões\n// Por ora, retornamos a configuração para processamento manual\n\nreturn {\n  versionChecks,\n  note: 'Verificação de versões requer análise manual ou scraping específico',\n  lastCheck: new Date().toISOString()\n};"
+      },
+      "id": "dsm001-versions",
+      "name": "Check Versions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 500]
+    }
+  ],
+  "connections": {
+    "Weekly Check": {
+      "main": [
+        [{ "node": "List Sources", "type": "main", "index": 0 }]
+      ]
+    },
+    "Manual Check": {
+      "main": [
+        [{ "node": "List Sources", "type": "main", "index": 0 }]
+      ]
+    },
+    "List Sources": {
+      "main": [
+        [{ "node": "Check Health", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Health": {
+      "main": [
+        [{ "node": "Process Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Process Result": {
+      "main": [
+        [{ "node": "Aggregate Status", "type": "main", "index": 0 }]
+      ]
+    },
+    "Aggregate Status": {
+      "main": [
+        [
+          { "node": "Log to Database", "type": "main", "index": 0 },
+          { "node": "Check Versions", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Log to Database": {
+      "main": [
+        [{ "node": "Has Alerts?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Alerts?": {
+      "main": [
+        [{ "node": "Send Alert", "type": "main", "index": 0 }],
+        [{ "node": "All Healthy", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "1",
+  "triggerCount": 0,
+  "tags": [
+    { "name": "monitoring" },
+    { "name": "data-sources" }
+  ]
+}

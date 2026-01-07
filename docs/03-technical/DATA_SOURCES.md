@@ -11,6 +11,9 @@ Este documento detalha as fontes de dados oficiais utilizadas no sistema Tocanti
 | INEP | IDEB | 2005-2023 (ímpares) | Parcial | Bienal |
 | DataSUS | Mortalidade Infantil | 2000-2023 | TabNet | Anual |
 | SNIS | Saneamento | 2001-2022 | Não | Anual |
+| MapBiomas | Uso do Solo, Vegetação | 1985-2022 | Download | Anual |
+| SICONFI/Tesouro | Receitas, Despesas | 2015-2024 | Sim | Anual |
+| Comex Stat | Exportações, Importações | 1997-2024 | Sim | Mensal |
 
 ---
 
@@ -198,6 +201,174 @@ TMI = (Óbitos < 1 ano / Nascidos vivos) × 1.000
 
 ---
 
+## 6. MapBiomas - Uso e Cobertura do Solo
+
+### URL
+- Portal: https://brasil.mapbiomas.org/
+- Estatísticas: https://brasil.mapbiomas.org/estatisticas/
+- Plataforma: https://plataforma.brasil.mapbiomas.org/
+
+### Indicadores Coletados
+
+#### Cobertura de Vegetação Nativa
+- **Código**: `VEGETACAO_NATIVA_PCT`
+- **Unidade**: % do território municipal
+- **Anos**: 1985-2022 (Coleção 8)
+- **Resolução**: 30 metros
+
+#### Desmatamento Anual
+- **Código**: `DESMATAMENTO_HA`
+- **Unidade**: hectares/ano
+- **Cálculo**: Variação de vegetação nativa entre anos
+
+#### Uso Agropecuário
+- **Códigos**: `AGRICULTURA_HA`, `PASTAGEM_HA`
+- **Unidade**: hectares
+- **Classes MapBiomas**: 15 (pastagem), 18-48 (agricultura)
+
+### Metodologia de Coleta
+```
+Download: https://storage.googleapis.com/mapbiomas-public/initiatives/brasil/collection_8/downloads/statistics/
+Arquivo: MAPBIOMAS_COL8_TOCANTINS_MUNICIPIO.csv
+```
+
+### Classes de Uso (Nível 1)
+| Código | Classe |
+|--------|--------|
+| 1 | Floresta |
+| 2 | Formação Natural não Florestal |
+| 3 | Agropecuária |
+| 4 | Área não Vegetada |
+| 5 | Corpo d'Água |
+
+### Tratamento de Dados Faltantes
+- **Anos > 2022**: Aguardar Coleção 9 (previsão: Agosto 2024)
+- **Municípios**: Todos os 139 municípios possuem dados
+- **Estimativas**: Baseadas em médias regionais quando necessário
+
+### Limitações
+- Dados via download (não há API REST pública)
+- Atualização anual com defasagem de 6-12 meses
+- Algumas classes podem ter confusão em áreas de transição
+
+---
+
+## 7. SICONFI - Sistema de Informações Contábeis e Fiscais
+
+### URL
+- Portal: https://siconfi.tesouro.gov.br/
+- API: https://apidatalake.tesouro.gov.br/
+- Documentação: https://apidatalake.tesouro.gov.br/docs/siconfi/
+
+### Indicadores Coletados
+
+#### Receita Corrente Líquida (RCL)
+- **Código**: `RECEITA_CORRENTE_LIQUIDA`
+- **Unidade**: R$
+- **Fonte**: DCA (Declaração de Contas Anuais) / RREO
+
+#### Receitas Tributárias
+- **Códigos**: `RECEITA_TRIBUTARIA`, `RECEITA_IPTU`, `RECEITA_ISS`, `RECEITA_ITBI`
+- **Unidade**: R$
+- **Classificação**: Código de conta 1.1.x
+
+#### Despesas por Função
+- **Códigos**: `DESPESA_EDUCACAO`, `DESPESA_SAUDE`, `DESPESA_PESSOAL`
+- **Unidade**: R$
+- **Funções**: 12 (Educação), 10 (Saúde)
+
+#### Índice de Dependência de Transferências
+- **Código**: `INDICE_DEPENDENCIA_TRANSFERENCIAS`
+- **Fórmula**: (Transferências Correntes / RCL) × 100
+- **Interpretação**: >70% indica alta dependência
+
+### Metodologia de Coleta (API REST)
+```
+# Receitas - DCA
+GET https://apidatalake.tesouro.gov.br/ords/siconfi/tt/dca_orcamentaria
+    ?an_exercicio=2023
+    &no_anexo=DCA-Anexo%20I-C
+    &id_ente=1721000
+
+# Despesas - DCA
+GET https://apidatalake.tesouro.gov.br/ords/siconfi/tt/dca_orcamentaria
+    ?an_exercicio=2023
+    &no_anexo=DCA-Anexo%20I-E
+    &id_ente=1721000
+```
+
+### Demonstrativos Disponíveis
+| Sigla | Nome | Periodicidade |
+|-------|------|---------------|
+| DCA | Declaração de Contas Anuais | Anual |
+| RREO | Relatório Resumido Execução Orçamentária | Bimestral |
+| RGF | Relatório de Gestão Fiscal | Quadrimestral |
+
+### Tratamento de Dados Faltantes
+- **Municípios sem DCA**: Usar dados do RREO (último bimestre)
+- **Anos recentes**: Podem ter atraso de envio pelos municípios
+- **Validação**: Cruzar com dados do FINBRA quando disponível
+
+### Limitações
+- Dependente do envio pelos municípios
+- Qualidade dos dados varia
+- Padronização contábil em implementação
+
+---
+
+## 8. Comex Stat - Estatísticas de Comércio Exterior
+
+### URL
+- Portal: http://comexstat.mdic.gov.br/
+- Documentação: http://comexstat.mdic.gov.br/pt/about
+
+### Indicadores Coletados
+
+#### Exportações
+- **Código**: `EXPORTACOES_FOB_USD`
+- **Unidade**: US$ (valor FOB)
+- **Desagregação**: Município, produto (NCM/SH)
+
+#### Importações
+- **Código**: `IMPORTACOES_FOB_USD`
+- **Unidade**: US$ (valor FOB)
+
+#### Balança Comercial
+- **Código**: `BALANCA_COMERCIAL_USD`
+- **Fórmula**: Exportações - Importações
+
+### Principais Produtos do Tocantins
+| Posição | Produto | % Exportações |
+|---------|---------|---------------|
+| 1 | Soja em grãos | ~65% |
+| 2 | Carne bovina | ~20% |
+| 3 | Milho | ~8% |
+| 4 | Óleo de soja | ~4% |
+| 5 | Celulose | ~2% |
+
+### Metodologia de Coleta
+```
+# Exportações por município
+POST http://api.comexstat.mdic.gov.br/cities
+{
+  "coAno": 2023,
+  "coUfIbge": "17",
+  "fluxo": 1
+}
+```
+
+### Tratamento de Dados Faltantes
+- **Municípios sem atividade**: Registrar como zero (valor oficial)
+- **Dados confidenciais**: Alguns produtos são omitidos por sigilo
+- **Estimativas**: Baseadas em participação histórica no comércio estadual
+
+### Limitações
+- Muitos municípios pequenos não têm atividade exportadora
+- Concentração em poucos municípios produtores de soja/carne
+- API pode ter instabilidades
+
+---
+
 ## Execução da Coleta
 
 ### Comando
@@ -210,6 +381,15 @@ npx ts-node src/collectors/index.ts --years=2022,2023,2024
 
 # Saída em JSON
 npx ts-node src/collectors/index.ts --output=json
+
+# Teste piloto apenas para Palmas
+npx ts-node src/tests/integration/test-palmas.ts
+
+# Teste de integração completo
+npx ts-node src/tests/integration/test-full-flow.ts
+
+# Teste de um único município
+npx ts-node src/tests/integration/test-full-flow.ts --municipality=1721000
 ```
 
 ### Saída
@@ -217,9 +397,23 @@ Os dados coletados são salvos em:
 - `src/database/seeds/collected/data_collection_YYYY-MM-DD.sql`
 - `src/database/seeds/collected/data_collection_YYYY-MM-DD.json`
 
-### Workflow n8n
-Para coleta automatizada mensal, importar o workflow:
-- `n8n/workflows/data-collection-ibge.json`
+### Workflows n8n
+
+Para coleta automatizada, importar os workflows:
+
+| Workflow | Arquivo | Descrição |
+|----------|---------|-----------|
+| Coleta Inicial | `n8n/workflows/data-collection-initial.json` | Carga inicial de todos os dados |
+| Coleta Mensal | `n8n/workflows/data-collection-scheduled.json` | Atualização mensal (cron: dia 1, 3h) |
+| Monitoramento | `n8n/workflows/data-sources-monitor.json` | Verifica disponibilidade das APIs (semanal) |
+
+#### Configuração do Monitoramento
+O workflow de monitoramento verifica:
+- Disponibilidade das APIs (HTTP 200)
+- Tempo de resposta
+- Novas versões de dados (ex: MapBiomas Coleção)
+
+Alertas são enviados via Slack quando há problemas detectados.
 
 ---
 
