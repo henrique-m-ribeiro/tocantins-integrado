@@ -185,16 +185,21 @@ export class MapBiomasCollector extends BaseCollector {
           ? (summary.native_vegetation / summary.total_area) * 100
           : null;
 
+        // NOTA: Sem acesso ao download oficial do MapBiomas
+        // Dados marcados como indisponíveis até integração com fonte oficial
+        // Referência: MapBiomas. Coleção 8 da Série Anual de Mapas de Uso e Cobertura da Terra do Brasil. 2023.
+        // Download disponível em: https://brasil.mapbiomas.org/estatisticas/
+
         this.addResult({
           indicator_code: 'VEGETACAO_NATIVA_PCT',
           municipality_ibge: muni.ibge_code,
           year,
-          value: vegNativaPct !== null ? Math.round(vegNativaPct * 100) / 100 : null,
+          value: null,
           source: this.sourceName,
-          source_url: `https://plataforma.brasil.mapbiomas.org/`,
+          source_url: `https://brasil.mapbiomas.org/estatisticas/`,
           collection_date: new Date().toISOString(),
-          data_quality: 'estimated',
-          notes: 'Estimativa baseada em dados regionais do MapBiomas Coleção 8'
+          data_quality: 'unavailable',
+          notes: 'Dado requer download da planilha oficial MapBiomas Coleção 8. Ref: MapBiomas (2023)'
         });
 
         // Agricultura (ha)
@@ -202,12 +207,12 @@ export class MapBiomasCollector extends BaseCollector {
           indicator_code: 'AGRICULTURA_HA',
           municipality_ibge: muni.ibge_code,
           year,
-          value: summary.agriculture,
+          value: null,
           source: this.sourceName,
-          source_url: `https://plataforma.brasil.mapbiomas.org/`,
+          source_url: `https://brasil.mapbiomas.org/estatisticas/`,
           collection_date: new Date().toISOString(),
-          data_quality: 'estimated',
-          notes: 'Estimativa baseada em dados regionais do MapBiomas Coleção 8'
+          data_quality: 'unavailable',
+          notes: 'Dado requer download da planilha oficial MapBiomas Coleção 8. Ref: MapBiomas (2023)'
         });
 
         // Pastagem (ha)
@@ -215,12 +220,12 @@ export class MapBiomasCollector extends BaseCollector {
           indicator_code: 'PASTAGEM_HA',
           municipality_ibge: muni.ibge_code,
           year,
-          value: summary.pasture,
+          value: null,
           source: this.sourceName,
-          source_url: `https://plataforma.brasil.mapbiomas.org/`,
+          source_url: `https://brasil.mapbiomas.org/estatisticas/`,
           collection_date: new Date().toISOString(),
-          data_quality: 'estimated',
-          notes: 'Estimativa baseada em dados regionais do MapBiomas Coleção 8'
+          data_quality: 'unavailable',
+          notes: 'Dado requer download da planilha oficial MapBiomas Coleção 8. Ref: MapBiomas (2023)'
         });
 
         // Área Urbana (ha)
@@ -228,12 +233,12 @@ export class MapBiomasCollector extends BaseCollector {
           indicator_code: 'AREA_URBANA_HA',
           municipality_ibge: muni.ibge_code,
           year,
-          value: summary.urban,
+          value: null,
           source: this.sourceName,
-          source_url: `https://plataforma.brasil.mapbiomas.org/`,
+          source_url: `https://brasil.mapbiomas.org/estatisticas/`,
           collection_date: new Date().toISOString(),
-          data_quality: 'estimated',
-          notes: 'Estimativa baseada em dados regionais do MapBiomas Coleção 8'
+          data_quality: 'unavailable',
+          notes: 'Dado requer download da planilha oficial MapBiomas Coleção 8. Ref: MapBiomas (2023)'
         });
 
         // Água (ha)
@@ -241,12 +246,12 @@ export class MapBiomasCollector extends BaseCollector {
           indicator_code: 'AGUA_HA',
           municipality_ibge: muni.ibge_code,
           year,
-          value: summary.water,
+          value: null,
           source: this.sourceName,
-          source_url: `https://plataforma.brasil.mapbiomas.org/`,
+          source_url: `https://brasil.mapbiomas.org/estatisticas/`,
           collection_date: new Date().toISOString(),
-          data_quality: 'estimated',
-          notes: 'Estimativa baseada em dados regionais do MapBiomas Coleção 8'
+          data_quality: 'unavailable',
+          notes: 'Dado requer download da planilha oficial MapBiomas Coleção 8. Ref: MapBiomas (2023)'
         });
 
       } catch (error) {
@@ -458,44 +463,43 @@ export class MapBiomasCollector extends BaseCollector {
     const availableYears = years.filter(y => y >= 1985 && y <= 2022);
 
     for (const year of availableYears) {
-      const summary = this.estimateMunicipalData(ibgeCode, year);
-
-      const vegNativaPct = summary.total_area > 0
-        ? (summary.native_vegetation / summary.total_area) * 100
-        : null;
+      // NOTA: Dados oficiais requerem download da planilha MapBiomas
+      // Referência: MapBiomas. Coleção 8 da Série Anual de Mapas. 2023.
 
       this.addResult({
         indicator_code: 'VEGETACAO_NATIVA_PCT',
         municipality_ibge: ibgeCode,
         year,
-        value: vegNativaPct !== null ? Math.round(vegNativaPct * 100) / 100 : null,
+        value: null,
         source: this.sourceName,
-        source_url: 'https://plataforma.brasil.mapbiomas.org/',
+        source_url: 'https://brasil.mapbiomas.org/estatisticas/',
         collection_date: new Date().toISOString(),
-        data_quality: 'estimated',
-        notes: 'Estimativa baseada em dados regionais do MapBiomas'
+        data_quality: 'unavailable',
+        notes: 'Dado requer download da planilha oficial MapBiomas Coleção 8. Ref: MapBiomas (2023)'
       });
 
       this.addResult({
         indicator_code: 'AGRICULTURA_HA',
         municipality_ibge: ibgeCode,
         year,
-        value: summary.agriculture,
+        value: null,
         source: this.sourceName,
-        source_url: 'https://plataforma.brasil.mapbiomas.org/',
+        source_url: 'https://brasil.mapbiomas.org/estatisticas/',
         collection_date: new Date().toISOString(),
-        data_quality: 'estimated'
+        data_quality: 'unavailable',
+        notes: 'Dado requer download da planilha oficial MapBiomas Coleção 8. Ref: MapBiomas (2023)'
       });
 
       this.addResult({
         indicator_code: 'PASTAGEM_HA',
         municipality_ibge: ibgeCode,
         year,
-        value: summary.pasture,
+        value: null,
         source: this.sourceName,
-        source_url: 'https://plataforma.brasil.mapbiomas.org/',
+        source_url: 'https://brasil.mapbiomas.org/estatisticas/',
         collection_date: new Date().toISOString(),
-        data_quality: 'estimated'
+        data_quality: 'unavailable',
+        notes: 'Dado requer download da planilha oficial MapBiomas Coleção 8. Ref: MapBiomas (2023)'
       });
     }
 

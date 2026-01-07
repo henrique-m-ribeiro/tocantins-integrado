@@ -228,39 +228,26 @@ export class ComexStatCollector extends BaseCollector {
   }
 
   /**
-   * Coletar estimativas quando API não disponível
-   * Baseado em dados públicos do Comex Stat e distribuição regional
+   * Marcar dados como indisponíveis quando API não está acessível
+   * NÃO usar estimativas - apenas dados oficiais conforme requisito MVP
+   * Referência: MDIC. Sistema de Análise das Informações de Comércio Exterior. 2024.
    */
   private async collectTradeEstimates(year: number, flowType: number): Promise<void> {
     const indicatorCode = flowType === FLOW_TYPES.EXPORT ? 'EXPORTACOES_FOB_USD' : 'IMPORTACOES_FOB_USD';
-    const weightCode = flowType === FLOW_TYPES.EXPORT ? 'PESO_EXPORTACOES_KG' : 'PESO_IMPORTACOES_KG';
+    const flowName = flowType === FLOW_TYPES.EXPORT ? 'exportações' : 'importações';
 
-    // Dados totais do Tocantins por ano (fonte: Comex Stat - valores aproximados)
-    // Tocantins é um estado predominantemente exportador (soja, carne)
-    const stateExports = this.getStateTradeEstimate(year, 'export');
-    const stateImports = this.getStateTradeEstimate(year, 'import');
-
-    const totalValue = flowType === FLOW_TYPES.EXPORT ? stateExports : stateImports;
-
-    // Distribuir entre municípios com base na participação econômica
-    const distribution = this.getMunicipalDistribution();
-
+    // API não disponível - marcar como indisponível ao invés de estimar
     for (const muni of this.getMunicipalities()) {
-      const share = distribution[muni.ibge_code] || 0;
-      const value = Math.round(totalValue * share);
-
       this.addResult({
         indicator_code: indicatorCode,
         municipality_ibge: muni.ibge_code,
         year,
-        value,
+        value: null,
         source: this.sourceName,
         source_url: 'http://comexstat.mdic.gov.br/',
         collection_date: new Date().toISOString(),
-        data_quality: value > 0 ? 'estimated' : 'official',
-        notes: value > 0
-          ? 'Estimativa baseada em participação regional no comércio estadual'
-          : 'Sem registro de atividade de comércio exterior'
+        data_quality: 'unavailable',
+        notes: `Dados de ${flowName} requerem acesso à API Comex Stat. Consultar: http://comexstat.mdic.gov.br/pt/municipio. Ref: MDIC (2024)`
       });
     }
   }
@@ -390,6 +377,9 @@ export class ComexStatCollector extends BaseCollector {
 
   /**
    * Coletar dados para um único município
+   * NOTA: Requer acesso à API oficial do Comex Stat
+   * Dados marcados como indisponíveis se API não acessível
+   * Referência: MDIC. Sistema de Análise das Informações de Comércio Exterior. 2024.
    */
   async collectForMunicipality(ibgeCode: string, years: number[]): Promise<CollectionResult[]> {
     this.reset();
@@ -405,53 +395,43 @@ export class ComexStatCollector extends BaseCollector {
     const availableYears = years.filter(y => y >= 1997);
 
     for (const year of availableYears) {
-      // Usar distribuição estimada
-      const distribution = this.getMunicipalDistribution();
-      const share = distribution[ibgeCode] || 0;
-
-      // Exportações
-      const stateExports = this.getStateTradeEstimate(year, 'export');
-      const municipalExports = Math.round(stateExports * share);
+      // Sem acesso à API oficial - marcar como indisponível
+      // NÃO usar estimativas conforme requisito MVP
 
       this.addResult({
         indicator_code: 'EXPORTACOES_FOB_USD',
         municipality_ibge: ibgeCode,
         year,
-        value: municipalExports,
+        value: null,
         source: this.sourceName,
         source_url: 'http://comexstat.mdic.gov.br/',
         collection_date: new Date().toISOString(),
-        data_quality: municipalExports > 0 ? 'estimated' : 'official',
-        notes: municipalExports > 0
-          ? 'Estimativa baseada em participação regional'
-          : 'Sem registro de atividade exportadora'
+        data_quality: 'unavailable',
+        notes: 'Dados requerem acesso à API Comex Stat. Consultar: http://comexstat.mdic.gov.br/pt/municipio. Ref: MDIC (2024)'
       });
-
-      // Importações
-      const stateImports = this.getStateTradeEstimate(year, 'import');
-      const municipalImports = Math.round(stateImports * share * 0.3); // Importações mais concentradas
 
       this.addResult({
         indicator_code: 'IMPORTACOES_FOB_USD',
         municipality_ibge: ibgeCode,
         year,
-        value: municipalImports,
+        value: null,
         source: this.sourceName,
         source_url: 'http://comexstat.mdic.gov.br/',
         collection_date: new Date().toISOString(),
-        data_quality: 'estimated'
+        data_quality: 'unavailable',
+        notes: 'Dados requerem acesso à API Comex Stat. Consultar: http://comexstat.mdic.gov.br/pt/municipio. Ref: MDIC (2024)'
       });
 
-      // Balança
       this.addResult({
         indicator_code: 'BALANCA_COMERCIAL_USD',
         municipality_ibge: ibgeCode,
         year,
-        value: municipalExports - municipalImports,
+        value: null,
         source: this.sourceName,
         source_url: 'http://comexstat.mdic.gov.br/',
         collection_date: new Date().toISOString(),
-        data_quality: 'estimated'
+        data_quality: 'unavailable',
+        notes: 'Dados requerem acesso à API Comex Stat. Consultar: http://comexstat.mdic.gov.br/pt/municipio. Ref: MDIC (2024)'
       });
     }
 

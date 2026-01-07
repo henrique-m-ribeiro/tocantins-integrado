@@ -120,6 +120,9 @@ export class AtlasBrasilCollector extends BaseCollector {
 
   /**
    * Coletar IDH de um município específico
+   * NOTA: IDHM oficial disponível apenas para anos de Censo (2000, 2010)
+   * O IDHM do Censo 2022 ainda não foi publicado pelo Atlas Brasil
+   * Referência: PNUD; IPEA; FJP. Atlas do Desenvolvimento Humano no Brasil. 2013.
    */
   private async collectMunicipalityIDH(
     ibge_code: string,
@@ -130,36 +133,22 @@ export class AtlasBrasilCollector extends BaseCollector {
 
     for (const year of years) {
       if (year === 2010 && idhData) {
-        // Dados oficiais do Censo 2010
+        // Dados oficiais do Censo 2010 - ÚNICO ANO COM DADOS OFICIAIS DISPONÍVEIS
         this.addOfficialIDH(ibge_code, idhData);
-      } else if (year >= 2020 && idhData?.idh_2020_estimado) {
-        // Estimativa para 2020+
-        this.addEstimatedIDH(ibge_code, year, idhData.idh_2020_estimado);
       } else {
-        // Dados não disponíveis - usar interpolação ou marcar como indisponível
-        if (idhData) {
-          // Interpolação simples baseada no IDH 2010
-          const estimatedIdh = this.interpolateIDH(idhData.idh_2010, year);
-          this.addResult({
-            indicator_code: 'IDH',
-            municipality_ibge: ibge_code,
-            year,
-            value: estimatedIdh,
-            source: this.sourceName,
-            source_url: `${this.sourceUrl}consulta/perfil/${ibge_code}`,
-            collection_date: new Date().toISOString(),
-            data_quality: 'estimated',
-            notes: `Estimativa baseada no IDH 2010 (${idhData.idh_2010}). Censo 2022 ainda não divulgou IDHM.`
-          });
-        } else {
-          // Município sem dados conhecidos
-          this.addResult(this.createUnavailableResult(
-            'IDH',
-            ibge_code,
-            year,
-            'Dados do IDH não encontrados para este município'
-          ));
-        }
+        // Anos diferentes de 2010: marcar como indisponível
+        // NÃO usar estimativas/interpolações conforme requisito MVP
+        this.addResult({
+          indicator_code: 'IDH',
+          municipality_ibge: ibge_code,
+          year,
+          value: null,
+          source: this.sourceName,
+          source_url: `${this.sourceUrl}consulta/perfil/${ibge_code}`,
+          collection_date: new Date().toISOString(),
+          data_quality: 'unavailable',
+          notes: `IDHM disponível apenas em anos de Censo (2010). Aguardando publicação IDHM 2022. Ref: PNUD/IPEA/FJP (2013)`
+        });
       }
     }
   }
@@ -247,43 +236,38 @@ export class AtlasBrasilCollector extends BaseCollector {
 
   /**
    * Gerar dados para todos os municípios do Tocantins
-   * Baseado nos dados conhecidos + estimativas para municípios sem dados
+   * NOTA: Apenas dados oficiais do Censo 2010 são retornados
+   * Municípios sem dados são marcados como indisponíveis
+   * Referência: PNUD; IPEA; FJP. Atlas do Desenvolvimento Humano no Brasil. 2013.
    */
   async generateFullDataset(years: number[]): Promise<CollectionResult[]> {
     this.reset();
     const municipalities = this.getMunicipalities();
 
     this.log(`Gerando dataset para ${municipalities.length} municípios...`);
-
-    // Calcular IDH médio conhecido para usar em municípios sem dados
-    const knownIDH = IDH_DATA_2010.map(d => d.idh_2010);
-    const avgIDH = knownIDH.reduce((a, b) => a + b, 0) / knownIDH.length;
-    const minIDH = Math.min(...knownIDH);
-    const maxIDH = Math.max(...knownIDH);
-
-    this.log(`IDH 2010 conhecido: média=${avgIDH.toFixed(3)}, min=${minIDH}, max=${maxIDH}`);
+    this.log('NOTA: Apenas dados oficiais do Censo 2010 disponíveis. Anos posteriores marcados como indisponíveis.');
 
     for (const municipality of municipalities) {
       const knownData = IDH_DATA_2010.find(d => d.ibge_code === municipality.ibge_code);
 
       for (const year of years) {
-        if (knownData) {
-          // Tem dados conhecidos
+        if (year === 2010 && knownData) {
+          // Dados oficiais do Censo 2010
           await this.collectMunicipalityIDH(municipality.ibge_code, municipality.name, [year]);
         } else {
-          // Estimar baseado na média regional
-          const estimatedIDH = this.estimateUnknownIDH(municipality.microregion, avgIDH);
-
+          // Marcar como indisponível - NÃO usar estimativas
           this.addResult({
             indicator_code: 'IDH',
             municipality_ibge: municipality.ibge_code,
             year,
-            value: this.interpolateIDH(estimatedIDH, year),
+            value: null,
             source: this.sourceName,
             source_url: this.sourceUrl,
             collection_date: new Date().toISOString(),
-            data_quality: 'estimated',
-            notes: `Estimativa baseada na média regional. IDH 2010 não encontrado individualmente.`
+            data_quality: 'unavailable',
+            notes: year !== 2010
+              ? `IDHM disponível apenas em anos de Censo (2010). Ref: PNUD/IPEA/FJP (2013)`
+              : `IDHM 2010 não disponível para este município na base do Atlas Brasil. Ref: PNUD/IPEA/FJP (2013)`
           });
         }
       }

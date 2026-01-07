@@ -91,33 +91,63 @@ export class SNISCollector extends BaseCollector {
 
   /**
    * Coletar dados de saneamento
+   * NOTA: Dados oficiais SNIS disponíveis apenas para 2020-2022
+   * Anos fora deste período são marcados como indisponíveis
+   * Referência: MDR. Sistema Nacional de Informações sobre Saneamento - SNIS. 2023.
    */
   async collect(years: number[]): Promise<CollectionResult[]> {
     this.reset();
     this.log('Iniciando coleta de dados do SNIS...');
-    this.log('NOTA: Dados disponíveis até 2022 (última publicação)');
+    this.log('NOTA: Dados oficiais disponíveis apenas para 2020-2022. Anos fora marcados como indisponíveis.');
 
     const availableYears = years.filter(y => y >= 2020 && y <= 2022);
+    const unavailableYears = years.filter(y => y < 2020 || y > 2022);
 
-    if (availableYears.length === 0) {
-      this.log('Anos solicitados fora do período disponível (2020-2022)');
-      // Usar 2022 como base para anos mais recentes
-      for (const year of years) {
-        await this.collectWithExtrapolation(year);
-      }
-    } else {
-      for (const year of availableYears) {
-        await this.collectSNISYear(year);
-      }
+    // Coletar dados oficiais para anos disponíveis
+    for (const year of availableYears) {
+      await this.collectSNISYear(year);
+    }
 
-      // Extrapolar para anos não disponíveis
-      for (const year of years.filter(y => !availableYears.includes(y))) {
-        await this.collectWithExtrapolation(year);
-      }
+    // Marcar anos fora do período como indisponíveis - NÃO extrapolar
+    for (const year of unavailableYears) {
+      await this.markYearUnavailable(year);
     }
 
     this.log(`Coleta finalizada. ${this.results.length} registros, ${this.errors.length} erros`);
     return this.results;
+  }
+
+  /**
+   * Marcar ano como indisponível (sem extrapolação)
+   */
+  private async markYearUnavailable(year: number): Promise<void> {
+    this.log(`Marcando ${year} como indisponível (fora do período SNIS 2020-2022)`);
+
+    for (const municipality of this.getMunicipalities()) {
+      this.addResult({
+        indicator_code: 'COBERTURA_AGUA',
+        municipality_ibge: municipality.ibge_code,
+        year,
+        value: null,
+        source: this.sourceName,
+        source_url: this.sourceUrl,
+        collection_date: new Date().toISOString(),
+        data_quality: 'unavailable',
+        notes: `Dados SNIS disponíveis apenas para 2020-2022. Consultar: http://app4.mdr.gov.br/serieHistorica/. Ref: MDR (2023)`
+      });
+
+      this.addResult({
+        indicator_code: 'COBERTURA_ESGOTO',
+        municipality_ibge: municipality.ibge_code,
+        year,
+        value: null,
+        source: this.sourceName,
+        source_url: this.sourceUrl,
+        collection_date: new Date().toISOString(),
+        data_quality: 'unavailable',
+        notes: `Dados SNIS disponíveis apenas para 2020-2022. Consultar: http://app4.mdr.gov.br/serieHistorica/. Ref: MDR (2023)`
+      });
+    }
   }
 
   /**
@@ -141,6 +171,8 @@ export class SNISCollector extends BaseCollector {
 
   /**
    * Adicionar cobertura de água
+   * NOTA: Apenas dados oficiais - sem estimativas
+   * Referência: MDR. SNIS - Diagnóstico dos Serviços de Água e Esgotos. 2023.
    */
   private async addWaterCoverage(
     ibge_code: string,
@@ -161,32 +193,31 @@ export class SNISCollector extends BaseCollector {
           source_url: `${this.config.baseUrl}`,
           collection_date: new Date().toISOString(),
           data_quality: 'official',
-          notes: 'IN055 - Índice de atendimento total de água (%)'
+          notes: 'IN055 - Índice de atendimento total de água (%). Ref: MDR/SNIS (2023)'
         });
         return;
       }
     }
 
-    // Estimar baseado na média estadual
-    const stateAvg = REFERENCE_VALUES.tocantins.agua[year as keyof typeof REFERENCE_VALUES.tocantins.agua];
-    const municipality = this.getMunicipalities().find(m => m.ibge_code === ibge_code);
-    const estimatedValue = this.estimateWaterCoverage(municipality?.microregion || '', stateAvg || 85);
-
+    // Município sem dados na base SNIS - marcar como indisponível
+    // NÃO usar estimativas conforme requisito MVP
     this.addResult({
       indicator_code: 'COBERTURA_AGUA',
       municipality_ibge: ibge_code,
       year,
-      value: estimatedValue,
+      value: null,
       source: this.sourceName,
       source_url: this.sourceUrl,
       collection_date: new Date().toISOString(),
-      data_quality: 'estimated',
-      notes: `Estimativa baseada na média regional. Média TO ${year}: ${stateAvg}%`
+      data_quality: 'unavailable',
+      notes: `Município sem dados na base SNIS ${year}. Consultar: http://app4.mdr.gov.br/serieHistorica/. Ref: MDR (2023)`
     });
   }
 
   /**
    * Adicionar cobertura de esgoto
+   * NOTA: Apenas dados oficiais - sem estimativas
+   * Referência: MDR. SNIS - Diagnóstico dos Serviços de Água e Esgotos. 2023.
    */
   private async addSewerageCoverage(
     ibge_code: string,
@@ -207,27 +238,24 @@ export class SNISCollector extends BaseCollector {
           source_url: `${this.config.baseUrl}`,
           collection_date: new Date().toISOString(),
           data_quality: 'official',
-          notes: 'IN056 - Índice de atendimento total de esgoto (%)'
+          notes: 'IN056 - Índice de atendimento total de esgoto (%). Ref: MDR/SNIS (2023)'
         });
         return;
       }
     }
 
-    // Estimar baseado na média estadual
-    const stateAvg = REFERENCE_VALUES.tocantins.esgoto[year as keyof typeof REFERENCE_VALUES.tocantins.esgoto];
-    const municipality = this.getMunicipalities().find(m => m.ibge_code === ibge_code);
-    const estimatedValue = this.estimateSewerageCoverage(municipality?.microregion || '', stateAvg || 29);
-
+    // Município sem dados na base SNIS - marcar como indisponível
+    // NÃO usar estimativas conforme requisito MVP
     this.addResult({
       indicator_code: 'COBERTURA_ESGOTO',
       municipality_ibge: ibge_code,
       year,
-      value: estimatedValue,
+      value: null,
       source: this.sourceName,
       source_url: this.sourceUrl,
       collection_date: new Date().toISOString(),
-      data_quality: 'estimated',
-      notes: `Estimativa baseada na média regional. Média TO ${year}: ${stateAvg}%`
+      data_quality: 'unavailable',
+      notes: `Município sem dados na base SNIS ${year}. Consultar: http://app4.mdr.gov.br/serieHistorica/. Ref: MDR (2023)`
     });
   }
 
