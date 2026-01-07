@@ -266,6 +266,54 @@ class ApiClient {
     }>('/indicators/meta/dimensions');
   }
 
+  /**
+   * Obter metadados completos de um indicador (para tooltips)
+   */
+  async getIndicatorMetadata(indicatorCode: string) {
+    return this.request<{
+      code: string;
+      name: string;
+      description: string;
+      tooltip_text: string;
+      interpretation_guide: string;
+      unit: string;
+      source: string;
+      source_url?: string;
+      methodology?: string;
+      calculation_formula?: string;
+      higher_is_better: boolean;
+      dimension: string;
+      category_name: string;
+      reference_values?: {
+        nacional?: number;
+        regional_norte?: number;
+        meta_ods?: number;
+        meta_pne?: number;
+      };
+      tags?: string[];
+    }>(`/indicators/${indicatorCode}/metadata`);
+  }
+
+  /**
+   * Obter série histórica de um indicador para um município
+   */
+  async getIndicatorHistory(
+    indicatorCode: string,
+    municipalityId: string,
+    yearsBack: number = 5
+  ) {
+    return this.request<Array<{
+      year: number;
+      value: number;
+      rank_state?: number;
+      percentile_state?: number;
+      state_avg?: number;
+      microregion_avg?: number;
+      year_change?: number;
+      trend?: 'up' | 'down' | 'stable';
+    }>>(`/indicators/${indicatorCode}/history/${municipalityId}?years=${yearsBack}`);
+  }
+
   // ==================
   // Chat Local (Exploração Rápida)
   // ==================
