@@ -126,3 +126,10 @@ waitForPort = 5000
 
 [agent]
 expertMode = true
+
+[userenv]
+
+[userenv.shared]
+SUPABASE_URL = "https://uyjrltzujeyploconacx.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5anJsdHp1amV5cGxvY29uYWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4OTQ2MjgsImV4cCI6MjA4MzQ3MDYyOH0.E7wkQ-YbEDEBaXxW6GrbcyXajsuwaIxs4W2ZK8Jr_CE"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5anJsdHp1amV5cGxvY29uYWN4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Nzg5NDYyOCwiZXhwIjoyMDgzNDcwNjI4fQ.3gVNSBiRNL8asluXMeOwa3TAOYDeiSVADvT251OdEMM"

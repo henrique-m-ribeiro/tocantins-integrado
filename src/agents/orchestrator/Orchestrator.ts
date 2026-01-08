@@ -71,14 +71,23 @@ export interface OrchestratorConfig {
 }
 
 export class Orchestrator {
-  private openai: OpenAI;
+  private _openai: OpenAI | null = null;
   private supabase: ReturnType<typeof getServiceClient>;
   private config: OrchestratorConfig;
 
+  private get openai(): OpenAI {
+    if (!this._openai) {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error('OPENAI_API_KEY não configurada. A funcionalidade de IA não está disponível.');
+      }
+      this._openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+      });
+    }
+    return this._openai;
+  }
+
   constructor(config?: Partial<OrchestratorConfig>) {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
     this.supabase = getServiceClient();
     this.config = {
       model: config?.model || process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
