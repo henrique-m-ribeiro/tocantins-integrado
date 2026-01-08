@@ -242,3 +242,15 @@ export interface MunicipalityComparison {
   values: Record<string, Record<string, IndicatorValue>>; // [municipality_id][indicator_code]
   rankings: Record<string, number>; // [municipality_id] -> ranking position
 }
+
+// ============================================================================
+// Props de Componentes de Tabs
+// ============================================================================
+
+export interface TabProps {
+  municipality: Municipality | null;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+export type TabId = 'overview' | 'economic' | 'social' | 'territorial' | 'environmental' | 'comparison';
