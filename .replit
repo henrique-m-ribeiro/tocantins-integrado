@@ -1,0 +1,99 @@
+# Tocantins Integrado - Replit Configuration
+# Plataforma de Superinteligência Territorial do Tocantins
+
+run = "npm start"
+entrypoint = "src/api/server.ts"
+
+[env]
+NODE_ENV = "production"
+PORT = "3000"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "npm run migrate && npm run seed && npm start"]
+deploymentTarget = "cloudrun"
+ignorePorts = false
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[languages]
+
+[languages.typescript]
+pattern = "**/{*.ts,*.tsx}"
+
+[languages.typescript.languageServer]
+start = "typescript-language-server --stdio"
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+enabledForHosting = false
+
+[gitHubImport]
+requiredFiles = [".replit", "package.json"]
+
+[workflows]
+runButton = "Command"
+
+[[workflows.workflow]]
+name = "Install"
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install"
+
+[[workflows.workflow]]
+name = "Migrate DB"
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run migrate"
+
+[[workflows.workflow]]
+name = "Seed Data"
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run seed"
+
+[[workflows.workflow]]
+name = "Collect Data"
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run collect"
+
+[[workflows.workflow]]
+name = "Test Pilot"
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test:pilot"
+
+[[workflows.workflow]]
+name = "Validate Deploy"
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run validate"
+
+[[workflows.workflow]]
+name = "Full Deploy"
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install && npm run migrate && npm run seed && npm run validate"
