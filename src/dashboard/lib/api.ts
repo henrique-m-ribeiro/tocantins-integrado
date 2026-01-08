@@ -7,6 +7,18 @@
  * - n8n: Análises complexas sob demanda
  */
 
+import type {
+  Municipality,
+  Microregion,
+  Indicator,
+  IndicatorValue,
+  AIAnalysis,
+  ChatMessage,
+  Dimension,
+  ApiResponse,
+  PaginatedResponse,
+} from '@/types';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 const N8N_WEBHOOK_URL = process.env.NEXT_PUBLIC_N8N_URL || '';
 // Permite configurar o path do webhook do orquestrador (pode ser /webhook/orchestrator ou UUID)
@@ -62,12 +74,12 @@ class ApiClient {
     const query = searchParams.toString();
     return this.request<{
       count: number;
-      municipalities: any[];
+      municipalities: Municipality[];
     }>(`/municipalities${query ? `?${query}` : ''}`);
   }
 
   async getMunicipality(id: string) {
-    return this.request<any>(`/municipalities/${id}`);
+    return this.request<Municipality>(`/municipalities/${id}`);
   }
 
   async getMunicipalityProfile(id: string) {
@@ -82,7 +94,7 @@ class ApiClient {
   async getMicroregions() {
     return this.request<{
       count: number;
-      microregions: any[];
+      microregions: Microregion[];
     }>('/municipalities/regions/microregions');
   }
 
@@ -235,7 +247,7 @@ class ApiClient {
     const query = searchParams.toString();
     return this.request<{
       count: number;
-      indicators: any[];
+      indicators: Indicator[];
     }>(`/indicators${query ? `?${query}` : ''}`);
   }
 
