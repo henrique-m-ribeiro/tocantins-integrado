@@ -11,6 +11,8 @@ import { useTerritory } from '@/hooks/useTerritory';
 import { TerritorySelector } from '@/components/controls/TerritorySelector';
 import { TabNavigation } from '@/components/tabs/TabNavigation';
 import { OverviewTab } from '@/components/tabs/OverviewTab';
+import { EconomicTab } from '@/components/tabs/EconomicTab';
+import { SocialTab } from '@/components/tabs/SocialTab';
 import type { TabId } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -83,15 +85,19 @@ export default function HomePage() {
             )}
 
             {activeTab === 'economic' && (
-              <div className="text-center py-12 text-muted-foreground">
-                Tab Econômica (em desenvolvimento)
-              </div>
+              <EconomicTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
             )}
 
             {activeTab === 'social' && (
-              <div className="text-center py-12 text-muted-foreground">
-                Tab Social (em desenvolvimento)
-              </div>
+              <SocialTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
             )}
 
             {activeTab === 'territorial' && (
