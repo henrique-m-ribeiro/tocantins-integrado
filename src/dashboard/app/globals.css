@@ -12,14 +12,12 @@ body {
   background: rgb(var(--background-rgb));
 }
 
-/* Estilos do Mapa Leaflet */
 .leaflet-container {
   height: 100%;
   width: 100%;
   border-radius: 0.5rem;
 }
 
-/* Scrollbar customizada */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -39,7 +37,6 @@ body {
   background: #a1a1a1;
 }
 
-/* Animações */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -55,7 +52,6 @@ body {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* Chat styles */
 .chat-message {
   max-width: 85%;
 }
@@ -68,7 +64,6 @@ body {
   margin-right: auto;
 }
 
-/* Card hover effects */
 .card-hover {
   transition: all 0.2s ease;
 }

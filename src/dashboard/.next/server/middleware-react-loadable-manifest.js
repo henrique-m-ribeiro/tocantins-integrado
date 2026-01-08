@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"app/page.tsx -> @/components/map/TocantinsMap\":{\"id\":\"app/page.tsx -> @/components/map/TocantinsMap\",\"files\":[\"static/chunks/_app-pages-browser_components_map_TocantinsMap_tsx.js\"]}}"
