@@ -13,6 +13,8 @@ import { TabNavigation } from '@/components/tabs/TabNavigation';
 import { OverviewTab } from '@/components/tabs/OverviewTab';
 import { EconomicTab } from '@/components/tabs/EconomicTab';
 import { SocialTab } from '@/components/tabs/SocialTab';
+import { TerritorialTab } from '@/components/tabs/TerritorialTab';
+import { EnvironmentalTab } from '@/components/tabs/EnvironmentalTab';
 import type { TabId } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -101,15 +103,19 @@ export default function HomePage() {
             )}
 
             {activeTab === 'territorial' && (
-              <div className="text-center py-12 text-muted-foreground">
-                Tab Territorial (em desenvolvimento)
-              </div>
+              <TerritorialTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
             )}
 
             {activeTab === 'environmental' && (
-              <div className="text-center py-12 text-muted-foreground">
-                Tab Ambiental (em desenvolvimento)
-              </div>
+              <EnvironmentalTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
             )}
 
             {activeTab === 'comparison' && (
