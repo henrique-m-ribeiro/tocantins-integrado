@@ -15,6 +15,7 @@ import { EconomicTab } from '@/components/tabs/EconomicTab';
 import { SocialTab } from '@/components/tabs/SocialTab';
 import { TerritorialTab } from '@/components/tabs/TerritorialTab';
 import { EnvironmentalTab } from '@/components/tabs/EnvironmentalTab';
+import { ComparisonTab } from '@/components/tabs/ComparisonTab';
 import type { TabId } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -119,9 +120,11 @@ export default function HomePage() {
             )}
 
             {activeTab === 'comparison' && (
-              <div className="text-center py-12 text-muted-foreground">
-                Tab Comparação (em desenvolvimento)
-              </div>
+              <ComparisonTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
             )}
           </div>
 
