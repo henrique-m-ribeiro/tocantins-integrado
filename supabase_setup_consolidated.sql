@@ -666,15 +666,16 @@ COMMENT ON VIEW v_dimension_rankings IS 'Ranking de municípios por dimensão';
 -- View: Estatísticas de uso do sistema
 CREATE OR REPLACE VIEW v_usage_stats AS
 SELECT
-    DATE(created_at) AS date,
-    channel,
+    DATE(cm.created_at) AS date,
+    cs.channel,
     COUNT(*) AS total_messages,
-    COUNT(DISTINCT session_id) AS unique_sessions,
-    AVG(CASE WHEN metadata->>'processing_time_ms' IS NOT NULL
-        THEN (metadata->>'processing_time_ms')::INTEGER END) AS avg_processing_time_ms
-FROM chat_messages
-WHERE role = 'user'
-GROUP BY DATE(created_at), channel
+    COUNT(DISTINCT cm.session_id) AS unique_sessions,
+    AVG(CASE WHEN cm.metadata->>'processing_time_ms' IS NOT NULL
+        THEN (cm.metadata->>'processing_time_ms')::INTEGER END) AS avg_processing_time_ms
+FROM chat_messages cm
+JOIN chat_sessions cs ON cm.session_id = cs.id
+WHERE cm.role = 'user'
+GROUP BY DATE(cm.created_at), cs.channel
 ORDER BY date DESC;
 
 COMMENT ON VIEW v_usage_stats IS 'Estatísticas de uso do sistema';
