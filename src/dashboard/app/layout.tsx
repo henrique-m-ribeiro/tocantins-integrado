@@ -1,8 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import { Providers } from './providers';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Tocantins Integrado',
@@ -31,7 +28,7 @@ export default function RootLayout({
         />
         <link rel="stylesheet" href="/styles.css" />
       </head>
-      <body className={inter.className}>
+      <body className="font-sans antialiased">
         <Providers>
           {children}
         </Providers>
