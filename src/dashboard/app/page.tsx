@@ -1,94 +1,168 @@
+/**
+ * Página Principal do Dashboard
+ * Layout híbrido com navegação por tabs dimensionais
+ */
+
 'use client';
 
 import { useState } from 'react';
-import { MapPin, MessageSquare, BarChart3, FileText, Menu, X } from 'lucide-react';
-import dynamic from 'next/dynamic';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { Header } from '@/components/layout/Header';
-import { ChatPanel } from '@/components/chat/ChatPanel';
-import { MunicipalityPanel } from '@/components/municipality/MunicipalityPanel';
-import { StatsOverview } from '@/components/stats/StatsOverview';
-
-// Importar mapa dinamicamente para evitar SSR issues com Leaflet
-const TocantinsMap = dynamic(
-  () => import('@/components/map/TocantinsMap'),
-  { ssr: false, loading: () => <MapPlaceholder /> }
-);
-
-function MapPlaceholder() {
-  return (
-    <div className="h-full w-full flex items-center justify-center bg-gray-100 rounded-lg">
-      <div className="text-center text-gray-500">
-        <MapPin className="h-12 w-12 mx-auto mb-2 animate-pulse" />
-        <p>Carregando mapa...</p>
-      </div>
-    </div>
-  );
-}
+import { MessageSquare, X } from 'lucide-react';
+import { useTerritory } from '@/hooks/useTerritory';
+import { TerritorySelector } from '@/components/controls/TerritorySelector';
+import { TabNavigation } from '@/components/tabs/TabNavigation';
+import { OverviewTab } from '@/components/tabs/OverviewTab';
+import { EconomicTab } from '@/components/tabs/EconomicTab';
+import { SocialTab } from '@/components/tabs/SocialTab';
+import { TerritorialTab } from '@/components/tabs/TerritorialTab';
+import { EnvironmentalTab } from '@/components/tabs/EnvironmentalTab';
+import { ComparisonTab } from '@/components/tabs/ComparisonTab';
+import type { TabId } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 export default function HomePage() {
-  const [selectedMunicipality, setSelectedMunicipality] = useState<string | null>(null);
+  const { selectedMunicipality } = useTerritory();
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
-      <Header
-        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        onChatClick={() => setIsChatOpen(!isChatOpen)}
-        isChatOpen={isChatOpen}
-      />
-
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <Sidebar
-          isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-          selectedMunicipality={selectedMunicipality}
-          onSelectMunicipality={setSelectedMunicipality}
-        />
-
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Stats Overview */}
-          <div className="p-4 border-b bg-white">
-            <StatsOverview />
-          </div>
-
-          {/* Map and Municipality Panel */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Map Container */}
-            <div className="flex-1 p-4">
-              <div className="h-full bg-white rounded-lg shadow-sm overflow-hidden">
-                <TocantinsMap
-                  selectedMunicipality={selectedMunicipality}
-                  onSelectMunicipality={setSelectedMunicipality}
-                />
+      <header className="border-b bg-card sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo e Título */}
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="text-xl font-bold text-foreground">
+                  Tocantins Integrado
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Plataforma de Indicadores Municipais
+                </p>
               </div>
             </div>
 
-            {/* Municipality Details Panel */}
-            {selectedMunicipality && (
-              <div className="w-96 border-l bg-white overflow-y-auto">
-                <MunicipalityPanel
-                  municipalityId={selectedMunicipality}
-                  onClose={() => setSelectedMunicipality(null)}
-                />
+            {/* Seletor de Território */}
+            <div className="flex items-center gap-4">
+              <div className="w-80">
+                <TerritorySelector placeholder="Selecione um município" />
               </div>
+
+              {/* Botão Chat */}
+              <Button
+                variant={isChatOpen ? 'default' : 'outline'}
+                size="icon"
+                onClick={() => setIsChatOpen(!isChatOpen)}
+                title="Abrir chat de exploração"
+              >
+                {isChatOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <MessageSquare className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Navegação por Tabs */}
+      <div className="border-b bg-card">
+        <div className="container mx-auto px-4 py-2">
+          <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+        </div>
+      </div>
+
+      {/* Área de Conteúdo */}
+      <main className="flex-1 container mx-auto px-4 py-6">
+        <div className="flex gap-6">
+          {/* Conteúdo da Tab Ativa */}
+          <div className="flex-1">
+            {activeTab === 'overview' && (
+              <OverviewTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
+            )}
+
+            {activeTab === 'economic' && (
+              <EconomicTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
+            )}
+
+            {activeTab === 'social' && (
+              <SocialTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
+            )}
+
+            {activeTab === 'territorial' && (
+              <TerritorialTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
+            )}
+
+            {activeTab === 'environmental' && (
+              <EnvironmentalTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
+            )}
+
+            {activeTab === 'comparison' && (
+              <ComparisonTab
+                municipality={selectedMunicipality || null}
+                isLoading={false}
+                error={null}
+              />
             )}
           </div>
-        </main>
 
-        {/* Chat Panel */}
-        <ChatPanel
-          isOpen={isChatOpen}
-          onClose={() => setIsChatOpen(false)}
-          context={{
-            municipality_id: selectedMunicipality || undefined
-          }}
-        />
-      </div>
+          {/* Chat Sidebar (placeholder) */}
+          {isChatOpen && (
+            <aside className="w-96 shrink-0">
+              <Card className="sticky top-24 h-[calc(100vh-8rem)]">
+                <div className="p-4 border-b flex items-center justify-between">
+                  <h3 className="font-semibold">Chat de Exploração</h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsChatOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="p-4 h-full flex items-center justify-center text-muted-foreground text-sm">
+                  <div className="text-center space-y-2">
+                    <MessageSquare className="h-12 w-12 mx-auto opacity-50" />
+                    <p>Chat interativo será implementado aqui</p>
+                    <p className="text-xs">(Integração com módulo de IA)</p>
+                  </div>
+                </div>
+              </Card>
+            </aside>
+          )}
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-card py-4">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>
+            Tocantins Integrado © 2026 · Dados: IBGE, SICONFI, INEP
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
