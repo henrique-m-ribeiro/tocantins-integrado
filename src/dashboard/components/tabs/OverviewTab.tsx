@@ -5,7 +5,7 @@
 
 'use client';
 
-import { MapPin, Users, DollarSign, TrendingUp, Info } from 'lucide-react';
+import { MapPin, Users, DollarSign, TrendingUp, Info, Map } from 'lucide-react';
 import { useIndicators } from '@/hooks/useIndicators';
 import { KPIGrid, KPICard } from '@/components/cards/KPICard';
 import { EmptyState } from '@/components/shared/EmptyState';

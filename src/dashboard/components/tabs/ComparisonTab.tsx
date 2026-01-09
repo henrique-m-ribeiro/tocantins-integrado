@@ -365,7 +365,7 @@ export function ComparisonTab({ municipality, isLoading, error }: TabProps) {
                               {formatValue(ind.mun1, ind.formato)}
                             </td>
                             <td className="text-center p-3">
-                              {getComparisonIcon(ind.mun1, ind.mun2, ind.inverse)}
+                              {getComparisonIcon(ind.mun1, ind.mun2, 'inverse' in ind ? ind.inverse : false)}
                             </td>
                             <td className="text-right p-3 font-medium">
                               {formatValue(ind.mun2, ind.formato)}
