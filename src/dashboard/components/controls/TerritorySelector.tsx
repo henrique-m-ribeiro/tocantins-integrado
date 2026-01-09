@@ -241,7 +241,7 @@ export function TerritorySelector({
  * Versão simplificada usando Select nativo (sem Dialog)
  * Para uso em formulários ou espaços menores
  */
-export function SimpleTerritory Selector({
+export function SimpleTerritorySelector({
   className,
   placeholder = 'Selecione um município',
   onSelect,
