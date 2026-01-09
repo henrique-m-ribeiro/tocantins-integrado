@@ -326,6 +326,85 @@ class ApiClient {
     }>>(`/indicators/${indicatorCode}/history/${municipalityId}?years=${yearsBack}`);
   }
 
+  /**
+   * Obter indicadores por município e dimensão
+   * Útil para popular tabs dimensionais com dados reais
+   */
+  async getIndicatorsByDimension(
+    municipalityId: string,
+    dimension: string
+  ) {
+    return this.request<{
+      municipality_id: string;
+      dimension: string;
+      indicators: Array<{
+        code: string;
+        name: string;
+        value: number;
+        year: number;
+        unit: string;
+        rank_state?: number;
+        state_avg?: number;
+        trend?: 'up' | 'down' | 'stable';
+      }>;
+    }>(`/municipalities/${municipalityId}/indicators/${dimension}`);
+  }
+
+  /**
+   * Comparar indicadores entre dois municípios
+   * Retorna valores lado a lado para ComparisonTab
+   */
+  async compareMunicipalities(
+    municipalityId1: string,
+    municipalityId2: string,
+    dimension?: string
+  ) {
+    const params = new URLSearchParams();
+    params.set('municipality1', municipalityId1);
+    params.set('municipality2', municipalityId2);
+    if (dimension) params.set('dimension', dimension);
+
+    return this.request<{
+      municipality1: any;
+      municipality2: any;
+      comparison: Array<{
+        indicator_code: string;
+        indicator_name: string;
+        dimension: string;
+        unit: string;
+        value1: number;
+        value2: number;
+        difference: number;
+        difference_percent: number;
+      }>;
+    }>(`/municipalities/compare?${params.toString()}`);
+  }
+
+  /**
+   * Obter médias estaduais para comparação
+   * Retorna valores agregados do estado do Tocantins
+   */
+  async getStateAverages(dimension?: string, year?: number) {
+    const params = new URLSearchParams();
+    if (dimension) params.set('dimension', dimension);
+    if (year) params.set('year', String(year));
+
+    return this.request<{
+      state: string;
+      year: number;
+      averages: Array<{
+        indicator_code: string;
+        indicator_name: string;
+        dimension: string;
+        average: number;
+        median: number;
+        min: number;
+        max: number;
+        unit: string;
+      }>;
+    }>(`/statistics/state-averages?${params.toString()}`);
+  }
+
   // ==================
   // Chat Local (Exploração Rápida)
   // ==================
