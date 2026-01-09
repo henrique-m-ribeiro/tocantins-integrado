@@ -921,11 +921,11 @@ ON CONFLICT (dimension, name) DO NOTHING;
 -- Inserir definições de indicadores principais
 INSERT INTO indicator_definitions (category_id, code, name, unit, source, periodicity, higher_is_better) VALUES
 -- Econômicos
-((SELECT id FROM indicator_categories WHERE dimension = 'ECON' AND name = 'Desenvolvimento Humano'), 'IDH', 'Índice de Desenvolvimento Humano Municipal', 'index', 'PNUD/IPEA/FJP', 'census', true),
 ((SELECT id FROM indicator_categories WHERE dimension = 'ECON' AND name = 'Comércio Exterior'), 'EXPORTACOES_FOB_USD', 'Exportações FOB (US$)', 'currency', 'MDIC', 'annual', true),
 ((SELECT id FROM indicator_categories WHERE dimension = 'ECON' AND name = 'Comércio Exterior'), 'IMPORTACOES_FOB_USD', 'Importações FOB (US$)', 'currency', 'MDIC', 'annual', false),
 ((SELECT id FROM indicator_categories WHERE dimension = 'ECON' AND name = 'Comércio Exterior'), 'BALANCA_COMERCIAL_USD', 'Balança Comercial (US$)', 'currency', 'MDIC', 'annual', true),
 -- Sociais
+((SELECT id FROM indicator_categories WHERE dimension = 'SOCIAL' AND name = 'Desenvolvimento Humano'), 'IDH', 'Índice de Desenvolvimento Humano Municipal', 'index', 'PNUD/IPEA/FJP', 'census', true),
 ((SELECT id FROM indicator_categories WHERE dimension = 'SOCIAL' AND name = 'Educação'), 'IDEB_ANOS_INICIAIS', 'IDEB Anos Iniciais', 'index', 'INEP', 'annual', true),
 ((SELECT id FROM indicator_categories WHERE dimension = 'SOCIAL' AND name = 'Educação'), 'IDEB_ANOS_FINAIS', 'IDEB Anos Finais', 'index', 'INEP', 'annual', true),
 ((SELECT id FROM indicator_categories WHERE dimension = 'SOCIAL' AND name = 'Educação'), 'IDEB_FUNDAMENTAL', 'IDEB Ensino Fundamental', 'index', 'INEP', 'annual', true),
