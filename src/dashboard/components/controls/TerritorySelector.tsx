@@ -135,25 +135,25 @@ export function TerritorySelector({
 
   return (
     <div className={cn('w-full', className)}>
+      <Button
+        variant="outline"
+        role="combobox"
+        onClick={() => setIsDialogOpen(true)}
+        className="w-full justify-between"
+        type="button"
+      >
+        {selectedMunicipality ? (
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            <span>{selectedMunicipality.name}</span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">{placeholder}</span>
+        )}
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={isDialogOpen}
-            className="w-full justify-between"
-          >
-            {selectedMunicipality ? (
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                <span>{selectedMunicipality.name}</span>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
-            )}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </DialogTrigger>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Selecionar Município</DialogTitle>
