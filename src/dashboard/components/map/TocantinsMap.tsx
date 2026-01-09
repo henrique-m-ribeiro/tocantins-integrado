@@ -4,7 +4,6 @@ import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { useQuery } from '@tanstack/react-query';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { api } from '@/lib/api';
 
 // Fix para ícones do Leaflet no Next.js

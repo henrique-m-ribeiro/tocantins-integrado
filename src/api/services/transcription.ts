@@ -10,9 +10,19 @@ import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import type { AudioTranscription } from '../../shared/types';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY não configurada. A transcrição de áudio não está disponível.');
+    }
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+  }
+  return openai;
+}
 
 const TEMP_DIR = '/tmp/tocantins-audio';
 
@@ -25,6 +35,7 @@ if (!existsSync(TEMP_DIR)) {
  * Transcreve áudio de uma URL usando OpenAI Whisper
  */
 export async function transcribeAudio(audioUrl: string): Promise<AudioTranscription> {
+  const client = getOpenAIClient();
   const tempFile = join(TEMP_DIR, `${uuidv4()}.ogg`);
 
   try {
@@ -45,7 +56,7 @@ export async function transcribeAudio(audioUrl: string): Promise<AudioTranscript
     });
 
     // Transcrever com Whisper
-    const transcription = await openai.audio.transcriptions.create({
+    const transcription = await client.audio.transcriptions.create({
       file: await import('fs').then(fs =>
         fs.createReadStream(tempFile)
       ),
@@ -87,8 +98,9 @@ export async function checkTranscriptionService(): Promise<boolean> {
       return false;
     }
 
+    const client = getOpenAIClient();
     // Tentar listar modelos para verificar conectividade
-    await openai.models.retrieve('whisper-1');
+    await client.models.retrieve('whisper-1');
     return true;
   } catch {
     return false;

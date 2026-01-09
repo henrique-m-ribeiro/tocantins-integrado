@@ -10,15 +10,24 @@ import type { Dimension, AgentConfig, AgentRequest, AgentResponse, DataPoint } f
 export abstract class BaseAgent {
   protected dimension: Dimension;
   protected config: AgentConfig;
-  protected openai: OpenAI;
+  private _openai: OpenAI | null = null;
   protected supabase: ReturnType<typeof getServiceClient>;
+
+  protected get openai(): OpenAI {
+    if (!this._openai) {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error('OPENAI_API_KEY não configurada. A funcionalidade de IA não está disponível.');
+      }
+      this._openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+      });
+    }
+    return this._openai;
+  }
 
   constructor(config: AgentConfig) {
     this.dimension = config.dimension;
     this.config = config;
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
     this.supabase = getServiceClient();
   }
 
