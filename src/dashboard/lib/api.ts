@@ -512,6 +512,28 @@ class ApiClient {
       body: JSON.stringify(data)
     });
   }
+
+  /**
+   * Enviar mensagem de chat
+   * TODO: Implementar quando backend estiver pronto
+   */
+  async sendChatMessage(data: {
+    session_id?: string;
+    message: string;
+    context?: {
+      municipality_id?: string;
+      microregion_id?: string;
+    };
+  }) {
+    return this.request<{
+      session_id: string;
+      message: ChatMessage;
+      suggestions?: string[];
+    }>('/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL, N8N_WEBHOOK_URL);

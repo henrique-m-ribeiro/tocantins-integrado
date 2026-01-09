@@ -45,7 +45,14 @@ export function ChatPanel({ isOpen, onClose, context }: ChatPanelProps) {
     },
     onSuccess: (data) => {
       setSessionId(data.session_id);
-      setMessages(prev => [...prev, data.message]);
+      // Convert ChatMessage to local Message format
+      const newMessage: Message = {
+        id: data.message.id,
+        role: data.message.role,
+        content: data.message.content,
+        created_at: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, newMessage]);
       setSuggestions(data.suggestions || []);
     }
   });
