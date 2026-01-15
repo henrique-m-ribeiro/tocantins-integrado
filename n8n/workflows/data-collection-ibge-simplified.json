@@ -1,0 +1,285 @@
+{
+  "name": "Tocantins Integrado - Coleta IBGE (Simplificado)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3,
+              "daysInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Agendamento Mensal",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {},
+      "id": "start-log",
+      "name": "Início da Coleta",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, ibge_code, name FROM municipalities ORDER BY name",
+        "options": {}
+      },
+      "id": "get-municipalities",
+      "name": "Buscar Municípios",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [680, 300],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-postgres",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "batch-municipalities",
+      "name": "Processar em Lotes",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://apisidra.ibge.gov.br/values/t/5938/n6/{{ $json.ibge_code }}/v/allxp/p/last/d/v37%202",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fetch-pib-data",
+      "name": "Buscar PIB Municipal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "url": "=https://apisidra.ibge.gov.br/values/t/6579/n6/{{ $json.ibge_code }}/v/allxp/p/last",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fetch-population-data",
+      "name": "Buscar População",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar dados do IBGE e formatar para inserção\nconst municipalityData = $('Processar em Lotes').first().json;\nconst municipalityId = municipalityData.id;\nconst municipalityIbgeCode = municipalityData.ibge_code;\nconst municipalityName = municipalityData.name;\n\n// Buscar dados das APIs\nconst pibNodes = $('Buscar PIB Municipal').all();\nconst popNodes = $('Buscar População').all();\n\nconst records = [];\nconst errors = [];\n\n// Processar PIB\ntry {\n  if (pibNodes.length > 0 && pibNodes[0].json) {\n    const pibResponse = pibNodes[0].json;\n    \n    // API SIDRA retorna array de objetos\n    if (Array.isArray(pibResponse) && pibResponse.length > 1) {\n      // Primeiro item é header, segundo é dados\n      const pibData = pibResponse[1];\n      \n      if (pibData && pibData.V && pibData.D3N) {\n        const year = parseInt(pibData.D3N);\n        const value = parseFloat(pibData.V.replace(',', '.'));\n        \n        if (!isNaN(year) && !isNaN(value)) {\n          records.push({\n            indicator_code: 'ECON_PIB_TOTAL',\n            municipality_id: municipalityId,\n            municipality_ibge: municipalityIbgeCode,\n            municipality_name: municipalityName,\n            year: year,\n            value: value,\n            data_quality: 'official',\n            notes: `PIB Municipal ${year} - IBGE SIDRA`\n          });\n        }\n      }\n    }\n  }\n} catch (error) {\n  errors.push({\n    indicator: 'PIB',\n    municipality: municipalityName,\n    error: error.message\n  });\n}\n\n// Processar População\ntry {\n  if (popNodes.length > 0 && popNodes[0].json) {\n    const popResponse = popNodes[0].json;\n    \n    // API SIDRA retorna array de objetos\n    if (Array.isArray(popResponse) && popResponse.length > 1) {\n      // Primeiro item é header, segundo é dados\n      const popData = popResponse[1];\n      \n      if (popData && popData.V && popData.D3N) {\n        const year = parseInt(popData.D3N);\n        const value = parseFloat(popData.V.replace(',', '.'));\n        \n        if (!isNaN(year) && !isNaN(value)) {\n          records.push({\n            indicator_code: 'SOCIAL_POPULACAO',\n            municipality_id: municipalityId,\n            municipality_ibge: municipalityIbgeCode,\n            municipality_name: municipalityName,\n            year: year,\n            value: value,\n            data_quality: 'official',\n            notes: `População ${year} - IBGE SIDRA`\n          });\n        }\n      }\n    }\n  }\n} catch (error) {\n  errors.push({\n    indicator: 'População',\n    municipality: municipalityName,\n    error: error.message\n  });\n}\n\n// Retornar resultados\nif (records.length > 0) {\n  console.log(`✅ ${municipalityName}: ${records.length} indicadores coletados`);\n  return records;\n} else {\n  console.log(`⚠️  ${municipalityName}: Nenhum dado coletado`);\n  if (errors.length > 0) {\n    console.error(`Erros: ${JSON.stringify(errors)}`);\n  }\n  return [];\n}"
+      },
+      "id": "process-data",
+      "name": "Processar Dados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Inserir ou atualizar indicador\nINSERT INTO indicator_values (\n  indicator_id,\n  municipality_id,\n  year,\n  value,\n  data_quality,\n  notes\n)\nSELECT \n  id.id,\n  $2::uuid,\n  $3::integer,\n  $4::decimal,\n  $5::varchar,\n  $6::text\nFROM indicator_definitions id\nWHERE id.code = $1\nON CONFLICT (indicator_id, municipality_id, year, month) \nDO UPDATE SET \n  value = EXCLUDED.value,\n  data_quality = EXCLUDED.data_quality,\n  notes = EXCLUDED.notes,\n  updated_at = NOW()\nRETURNING id, indicator_id, municipality_id, year, value",
+        "options": {}
+      },
+      "id": "upsert-indicators",
+      "name": "Inserir/Atualizar Indicadores",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [1560, 300],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-postgres",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.id }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "check-success",
+      "name": "Verificar Sucesso",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consolidar estatísticas da coleta\nconst successNodes = $('Verificar Sucesso').all();\nconst totalProcessed = successNodes.length;\n\nconst summary = {\n  timestamp: new Date().toISOString(),\n  total_records_inserted: totalProcessed,\n  status: 'completed',\n  message: `Coleta IBGE concluída: ${totalProcessed} indicadores atualizados`\n};\n\nconsole.log('📊 Resumo da Coleta:');\nconsole.log(JSON.stringify(summary, null, 2));\n\nreturn [summary];"
+      },
+      "id": "summary",
+      "name": "Consolidar Estatísticas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    }
+  ],
+  "connections": {
+    "Agendamento Mensal": {
+      "main": [
+        [
+          {
+            "node": "Início da Coleta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Início da Coleta": {
+      "main": [
+        [
+          {
+            "node": "Buscar Municípios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Municípios": {
+      "main": [
+        [
+          {
+            "node": "Processar em Lotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar em Lotes": {
+      "main": [
+        [
+          {
+            "node": "Buscar PIB Municipal",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Buscar População",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consolidar Estatísticas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar PIB Municipal": {
+      "main": [
+        [
+          {
+            "node": "Processar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar População": {
+      "main": [
+        [
+          {
+            "node": "Processar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Dados": {
+      "main": [
+        [
+          {
+            "node": "Inserir/Atualizar Indicadores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserir/Atualizar Indicadores": {
+      "main": [
+        [
+          {
+            "node": "Verificar Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Sucesso": {
+      "main": [
+        [
+          {
+            "node": "Processar em Lotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "tocantins-integrado"
+    },
+    {
+      "name": "data-collection"
+    },
+    {
+      "name": "ibge"
+    },
+    {
+      "name": "simplified"
+    }
+  ],
+  "pinData": {},
+  "meta": {
+    "instanceId": "n8n-cloud"
+  }
+}
