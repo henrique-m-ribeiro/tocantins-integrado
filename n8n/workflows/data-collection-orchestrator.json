@@ -1,0 +1,361 @@
+{
+  "name": "Data Collection Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger - Daily 3AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Executa diariamente às 3:00 AM (horário do servidor)\nInicia o processo de identificação de indicadores pendentes"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log início do processo\nconst now = new Date().toISOString();\nconsole.log(`[ORCHESTRATOR] Iniciando coleta de dados: ${now}`);\n\nreturn [{\n  start_time: now,\n  orchestrator_run_id: `orch_${Date.now()}`\n}];"
+      },
+      "id": "log-start",
+      "name": "Log Start",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "notes": "Registra início do processo e gera ID único da execução"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Buscar indicadores pendentes de coleta\n-- Prioriza: nunca coletados > vencidos > próximos\nSELECT \n  id,\n  code,\n  name,\n  dimension,\n  source_name,\n  api_endpoint,\n  api_params,\n  periodicity,\n  collection_method,\n  last_ref_date,\n  next_collection_date,\n  CASE\n    WHEN next_collection_date IS NULL THEN 'never_collected'\n    WHEN next_collection_date < CURRENT_DATE THEN 'overdue'\n    WHEN next_collection_date = CURRENT_DATE THEN 'due_today'\n    ELSE 'future'\n  END as collection_status\nFROM indicator_dictionary\nWHERE is_active = true\n  AND collection_method IN ('api', 'scraping')\n  AND (\n    next_collection_date IS NULL \n    OR next_collection_date <= CURRENT_DATE\n  )\nORDER BY \n  CASE \n    WHEN next_collection_date IS NULL THEN 1\n    WHEN next_collection_date < CURRENT_DATE THEN 2\n    ELSE 3\n  END,\n  source_name,\n  code;",
+        "options": {}
+      },
+      "id": "query-pending-indicators",
+      "name": "Query Pending Indicators",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [680, 300],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-postgres",
+          "name": "Supabase PostgreSQL"
+        }
+      },
+      "notes": "Consulta indicator_dictionary para identificar indicadores\nque precisam ser coletados (vencidos ou nunca coletados)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-indicators",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-has-indicators",
+      "name": "Check Has Indicators",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "notes": "Verifica se há indicadores pendentes\nSe não houver, encerra execução (nada a fazer)"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Agrupar indicadores por fonte de dados\nconst items = $input.all();\n\nif (!items || items.length === 0) {\n  console.log('[ORCHESTRATOR] Nenhum indicador pendente encontrado.');\n  return [];\n}\n\n// Agrupar por source_name\nconst groupedBySo urce = {};\n\nfor (const item of items) {\n  const indicator = item.json;\n  const source = indicator.source_name;\n  \n  if (!groupedBySource[source]) {\n    groupedBySource[source] = {\n      source_name: source,\n      indicators: [],\n      count: 0\n    };\n  }\n  \n  groupedBySource[source].indicators.push({\n    id: indicator.id,\n    code: indicator.code,\n    name: indicator.name,\n    dimension: indicator.dimension,\n    api_endpoint: indicator.api_endpoint,\n    api_params: indicator.api_params,\n    collection_status: indicator.collection_status\n  });\n  \n  groupedBySource[source].count++;\n}\n\n// Converter para array\nconst result = Object.values(groupedBySource);\n\nconsole.log(`[ORCHESTRATOR] Indicadores agrupados por fonte:`);\nfor (const group of result) {\n  console.log(`  • ${group.source_name}: ${group.count} indicadores`);\n}\n\nreturn result;"
+      },
+      "id": "group-by-source",
+      "name": "Group by Source",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200],
+      "notes": "Agrupa indicadores por source_name\nCada grupo será enviado para o workflow especialista correspondente"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Mapear fonte de dados para workflow especialista\nconst sourceToWorkflow = {\n  'IBGE Sidra': 'data-collection-ibge',\n  'IBGE': 'data-collection-ibge',\n  'INEP': 'data-collection-inep',\n  'MapBiomas': 'data-collection-mapbiomas',\n  'SICONFI': 'data-collection-siconfi',\n  'STN': 'data-collection-siconfi',\n  'e-Gestor AB': 'data-collection-egestor',\n  'SNIS': 'data-collection-snis',\n  'INPE': 'data-collection-inpe'\n};\n\nconst source = $json.source_name;\nconst workflowName = sourceToWorkflow[source];\n\nif (!workflowName) {\n  console.warn(`[ORCHESTRATOR] ⚠️  Workflow não encontrado para fonte: ${source}`);\n  return [{\n    ...$ json,\n    workflow_name: null,\n    should_skip: true,\n    skip_reason: 'workflow_not_implemented'\n  }];\n}\n\nconsole.log(`[ORCHESTRATOR] 📋 Preparando chamada: ${workflowName} (${$json.count} indicadores)`);\n\nreturn [{\n  ...$json,\n  workflow_name: workflowName,\n  should_skip: false\n}];"
+      },
+      "id": "map-source-to-workflow",
+      "name": "Map Source to Workflow",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 200],
+      "notes": "Mapeia source_name para o nome do workflow especialista\nEx: 'IBGE Sidra' → 'data-collection-ibge'"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "should-not-skip",
+              "leftValue": "={{ $json.should_skip }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-implemented-workflows",
+      "name": "Filter Implemented Workflows",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1560, 200],
+      "notes": "Filtra apenas fontes com workflow implementado\nPula fontes que ainda não têm workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Construir payload para workflow especialista\nconst payload = {\n  source_name: $json.source_name,\n  orchestrator_run_id: $('Log Start').first().json.orchestrator_run_id,\n  indicators: $json.indicators,\n  total_indicators: $json.count,\n  timestamp: new Date().toISOString()\n};\n\nconsole.log(`[ORCHESTRATOR] 🚀 Disparando: ${$json.workflow_name}`);\nconsole.log(`  Payload: ${JSON.stringify(payload, null, 2)}`);\n\nreturn [{\n  workflow_name: $json.workflow_name,\n  payload: payload\n}];"
+      },
+      "id": "prepare-payload",
+      "name": "Prepare Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 100],
+      "notes": "Prepara payload JSON para enviar ao workflow especialista\nInclui: source_name, indicators, orchestrator_run_id"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "requestMethod": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL }}/webhook/{{ $json.workflow_name }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=",
+              "value": "={{ JSON.stringify($json.payload) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "call-specialist-workflow",
+      "name": "Call Specialist Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8n-webhook-auth",
+          "name": "n8n Webhook Auth"
+        }
+      },
+      "notes": "Chama o workflow especialista via webhook\nTimeout: 5 minutos (coleta pode demorar)\nneverError: true para não interromper orquestração"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log resultado da chamada ao workflow especialista\nconst response = $json;\nconst workflowName = $('Prepare Payload').first().json.workflow_name;\n\nif (response.statusCode >= 200 && response.statusCode < 300) {\n  console.log(`[ORCHESTRATOR] ✅ ${workflowName} completado com sucesso`);\n  if (response.body && response.body.summary) {\n    console.log(`  ${JSON.stringify(response.body.summary)}`);\n  }\n} else {\n  console.error(`[ORCHESTRATOR] ❌ ${workflowName} falhou`);\n  console.error(`  Status: ${response.statusCode}`);\n  console.error(`  Erro: ${response.body ? JSON.stringify(response.body) : 'N/A'}`);\n}\n\nreturn [{\n  workflow_name: workflowName,\n  status_code: response.statusCode,\n  success: response.statusCode >= 200 && response.statusCode < 300,\n  response_body: response.body,\n  timestamp: new Date().toISOString()\n}];"
+      },
+      "id": "log-workflow-result",
+      "name": "Log Workflow Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 100],
+      "notes": "Registra resultado da execução do workflow especialista\nLoga sucesso ou falha com detalhes"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Consolidar resultados de todos os workflows\nconst results = $input.all().map(item => item.json);\nconst startTime = $('Log Start').first().json.start_time;\nconst endTime = new Date().toISOString();\n\nconst summary = {\n  orchestrator_run_id: $('Log Start').first().json.orchestrator_run_id,\n  start_time: startTime,\n  end_time: endTime,\n  duration_ms: new Date(endTime) - new Date(startTime),\n  total_workflows_called: results.length,\n  successful_workflows: results.filter(r => r.success).length,\n  failed_workflows: results.filter(r => !r.success).length,\n  workflows: results\n};\n\nconsole.log('[ORCHESTRATOR] 📊 Resumo da Execução:');\nconsole.log(`  Workflows chamados: ${summary.total_workflows_called}`);\nconsole.log(`  Sucessos: ${summary.successful_workflows}`);\nconsole.log(`  Falhas: ${summary.failed_workflows}`);\nconsole.log(`  Duração: ${(summary.duration_ms / 1000).toFixed(2)}s`);\n\nif (summary.failed_workflows > 0) {\n  console.warn('[ORCHESTRATOR] ⚠️  Atenção: Alguns workflows falharam!');\n  const failed = results.filter(r => !r.success);\n  failed.forEach(f => {\n    console.warn(`  • ${f.workflow_name}: ${f.status_code}`);\n  });\n}\n\nconsole.log('[ORCHESTRATOR] ✅ Orquestração concluída');\n\nreturn [summary];"
+      },
+      "id": "consolidate-results",
+      "name": "Consolidate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2440, 100],
+      "notes": "Consolida resultados de todos os workflows\nGera resumo final com estatísticas"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log quando não há indicadores pendentes\nconsole.log('[ORCHESTRATOR] ℹ️  Nenhum indicador pendente de coleta.');\nconsole.log('[ORCHESTRATOR] Todos os indicadores estão atualizados.');\n\nreturn [{\n  message: 'No indicators pending',\n  timestamp: new Date().toISOString()\n}];"
+      },
+      "id": "log-no-indicators",
+      "name": "Log No Indicators",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 400],
+      "notes": "Registra que não há indicadores pendentes\nEncerra execução normalmente"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger - Daily 3AM": {
+      "main": [
+        [
+          {
+            "node": "Log Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Start": {
+      "main": [
+        [
+          {
+            "node": "Query Pending Indicators",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Pending Indicators": {
+      "main": [
+        [
+          {
+            "node": "Check Has Indicators",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Has Indicators": {
+      "main": [
+        [
+          {
+            "node": "Group by Source",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log No Indicators",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group by Source": {
+      "main": [
+        [
+          {
+            "node": "Map Source to Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Source to Workflow": {
+      "main": [
+        [
+          {
+            "node": "Filter Implemented Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Implemented Workflows": {
+      "main": [
+        [
+          {
+            "node": "Prepare Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Payload": {
+      "main": [
+        [
+          {
+            "node": "Call Specialist Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Specialist Workflow": {
+      "main": [
+        [
+          {
+            "node": "Log Workflow Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Workflow Result": {
+      "main": [
+        [
+          {
+            "node": "Consolidate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "tocantins-integrado"
+    },
+    {
+      "name": "orchestrator"
+    },
+    {
+      "name": "data-collection"
+    }
+  ],
+  "pinData": {},
+  "meta": {
+    "instanceId": "n8n-cloud"
+  }
+}
