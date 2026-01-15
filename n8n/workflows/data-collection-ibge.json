@@ -1,78 +1,72 @@
 {
-  "name": "Tocantins Integrado - Coleta de Dados IBGE",
+  "name": "Data Collection - IBGE Sidra",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "triggerAtHour": 3,
-              "daysInterval": 30
-            }
-          ]
-        }
+        "httpMethod": "POST",
+        "path": "data-collection-ibge",
+        "responseMode": "responseNode",
+        "options": {}
       },
-      "id": "schedule-trigger",
-      "name": "Agendamento Mensal",
-      "type": "n8n-nodes-base.scheduleTrigger",
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [220, 300]
+      "position": [240, 300],
+      "webhookId": "data-collection-ibge",
+      "notes": "Recebe payload do orquestrador com lista de indicadores IBGE"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log início e validar payload\nconst payload = $json.body || $json;\n\nif (!payload.indicators || payload.indicators.length === 0) {\n  throw new Error('Payload inválido: indicators não encontrado');\n}\n\nconsole.log(`[IBGE] Iniciando coleta de ${payload.indicators.length} indicadores`);\nconsole.log(`[IBGE] Run ID: ${payload.orchestrator_run_id}`);\n\nreturn [{\n  ...payload,\n  start_time: new Date().toISOString()\n}];"
+      },
+      "id": "validate-payload",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "notes": "Valida payload recebido e extrai lista de indicadores"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id, code, name, base_url, api_type FROM data_sources WHERE code = 'IBGE_SIDRA' AND is_active = true",
-        "options": {}
-      },
-      "id": "get-source-config",
-      "name": "Buscar Config Fonte",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [440, 300],
-      "credentials": {
-        "postgres": {
-          "id": "postgres-credentials",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "insert",
-        "table": "collection_jobs",
-        "columns": "data_source_id, job_type, status, started_at",
-        "returnFields": "id",
-        "options": {}
-      },
-      "id": "create-job",
-      "name": "Criar Job de Coleta",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [660, 300],
-      "credentials": {
-        "postgres": {
-          "id": "postgres-credentials",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT ibge_code, name FROM municipalities ORDER BY name",
+        "query": "SELECT id, ibge_code, name \nFROM municipalities \nWHERE state_id = 'TO' \nORDER BY name",
         "options": {}
       },
       "id": "get-municipalities",
-      "name": "Listar Municípios",
+      "name": "Get Municipalities",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [880, 300],
+      "typeVersion": 2.4,
+      "position": [680, 300],
       "credentials": {
         "postgres": {
-          "id": "postgres-credentials",
+          "id": "supabase-postgres",
           "name": "Supabase PostgreSQL"
         }
-      }
+      },
+      "notes": "Busca todos os 139 municípios do Tocantins"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "indicator-0",
+              "name": "indicators",
+              "value": "={{ $('Validate Payload').first().json.indicators }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-indicators",
+      "name": "Set Indicators Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [900, 300],
+      "notes": "Preserva lista de indicadores no contexto"
     },
     {
       "parameters": {
@@ -80,259 +74,203 @@
         "options": {}
       },
       "id": "batch-municipalities",
-      "name": "Processar em Lotes",
+      "name": "Batch Municipalities",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1100, 300]
+      "position": [1120, 300],
+      "notes": "Processa 10 municípios por vez para evitar sobrecarga"
     },
     {
       "parameters": {
-        "url": "=https://apisidra.ibge.gov.br/values/t/5938/n6/{{ $json.ibge_code }}/v/allxp/p/last/d/v37%202",
-        "options": {
-          "timeout": 30000
-        }
+        "assignments": {
+          "assignments": [
+            {
+              "id": "indicator-loop",
+              "name": "indicators_to_collect",
+              "value": "={{ $('Set Indicators Context').first().json.indicators }}",
+              "type": "array"
+            },
+            {
+              "id": "municipality",
+              "name": "municipality",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "fetch-pib-data",
-      "name": "Buscar PIB Municipal",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
-      "position": [1320, 200]
+      "id": "prepare-indicator-loop",
+      "name": "Prepare Indicator Loop",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1340, 300],
+      "notes": "Prepara para loop de indicadores para cada município"
     },
     {
       "parameters": {
-        "url": "=https://apisidra.ibge.gov.br/values/t/6579/n6/{{ $json.ibge_code }}/v/allxp/p/last",
-        "options": {
-          "timeout": 30000
-        }
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Construir URLs da API IBGE Sidra para cada indicador\nconst indicators = $json.indicators_to_collect;\nconst municipality = $json.municipality;\n\nconst apiCalls = [];\n\nfor (const indicator of indicators) {\n  let url = indicator.api_endpoint;\n  \n  // Substituir placeholders\n  url = url.replace('{ibge_code}', municipality.ibge_code);\n  \n  apiCalls.push({\n    indicator_code: indicator.code,\n    indicator_name: indicator.name,\n    municipality_id: municipality.id,\n    municipality_ibge: municipality.ibge_code,\n    municipality_name: municipality.name,\n    url: url\n  });\n}\n\nreturn apiCalls;"
       },
-      "id": "fetch-population-data",
-      "name": "Buscar População",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
-      "position": [1320, 400]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Processar dados do IBGE e formatar para inserção\nconst pibData = $('Buscar PIB Municipal').all();\nconst popData = $('Buscar População').all();\nconst municipality = $input.first().json;\n\nconst records = [];\n\n// Processar PIB\nif (pibData.length > 0) {\n  const pib = pibData[0].json;\n  if (pib && pib.V) {\n    records.push({\n      indicator_code: 'ECON_PIB_TOTAL',\n      municipality_ibge: municipality.ibge_code,\n      year: parseInt(pib.D1N) || new Date().getFullYear() - 1,\n      value: parseFloat(pib.V.replace(',', '.')) || 0\n    });\n  }\n}\n\n// Processar População\nif (popData.length > 0) {\n  const pop = popData[0].json;\n  if (pop && pop.V) {\n    records.push({\n      indicator_code: 'SOCIAL_POPULACAO',\n      municipality_ibge: municipality.ibge_code,\n      year: parseInt(pop.D1N) || new Date().getFullYear(),\n      value: parseFloat(pop.V.replace(',', '.')) || 0\n    });\n  }\n}\n\nreturn records;"
-      },
-      "id": "process-data",
-      "name": "Processar Dados",
+      "id": "build-api-urls",
+      "name": "Build API URLs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, 300]
+      "position": [1560, 300],
+      "notes": "Constrói URLs da API IBGE Sidra dinamicamente\nUm URL por indicador por município"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "call-ibge-api",
+      "name": "Call IBGE API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300],
+      "notes": "Chama API IBGE Sidra\nneverError: true para não parar em erros individuais"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Processar resposta da API IBGE Sidra\nconst response = $json;\nconst metadata = $('Build API URLs').item.json;\n\n// Verificar se resposta é válida\nif (!response || typeof response !== 'object' || response.error) {\n  console.warn(`[IBGE] ⚠️  Erro na API para ${metadata.indicator_code} em ${metadata.municipality_name}`);\n  return [];\n}\n\n// API Sidra retorna array: [header, data, ...]\nlet data;\nif (Array.isArray(response) && response.length > 1) {\n  data = response[1]; // Segundo elemento tem os dados\n} else if (Array.isArray(response) && response.length === 1) {\n  return []; // Sem dados\n} else {\n  data = response;\n}\n\n// Extrair valor e ano\nlet value, year;\n\nif (data.V) {\n  value = parseFloat(data.V.toString().replace(',', '.'));\n}\n\nif (data.D3N) {\n  year = parseInt(data.D3N);\n} else if (data.D2N) {\n  year = parseInt(data.D2N);\n}\n\nif (isNaN(value) || isNaN(year)) {\n  console.warn(`[IBGE] ⚠️  Dados inválidos para ${metadata.indicator_code}`);\n  return [];\n}\n\nconsole.log(`[IBGE] ✓ ${metadata.municipality_name}: ${metadata.indicator_code} = ${value} (${year})`);\n\nreturn [{\n  indicator_code: metadata.indicator_code,\n  municipality_id: metadata.municipality_id,\n  year: year,\n  value: value,\n  data_quality: 'official',\n  notes: `Coletado automaticamente via IBGE Sidra API em ${new Date().toISOString()}`\n}];"
+      },
+      "id": "parse-response",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300],
+      "notes": "Parseia resposta JSON da API IBGE\nExtrai valor e ano de referência"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO indicator_values (indicator_id, municipality_id, year, value)\nSELECT \n  id.id,\n  m.id,\n  $3::integer,\n  $4::decimal\nFROM indicator_definitions id, municipalities m\nWHERE id.code = $1 AND m.ibge_code = $2\nON CONFLICT (indicator_id, municipality_id, year, month) \nDO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+        "query": "-- Inserir ou atualizar valor do indicador\nINSERT INTO indicator_values (\n  indicator_id,\n  municipality_id,\n  year,\n  value,\n  data_quality,\n  notes\n)\nSELECT \n  id.id,\n  $2::uuid,\n  $3::integer,\n  $4::decimal,\n  $5::varchar,\n  $6::text\nFROM indicator_definitions id\nWHERE id.code = $1\nON CONFLICT (indicator_id, municipality_id, year, month) \nDO UPDATE SET \n  value = EXCLUDED.value,\n  data_quality = EXCLUDED.data_quality,\n  notes = EXCLUDED.notes,\n  updated_at = NOW()\nRETURNING id, indicator_id, year, value;",
         "options": {}
       },
-      "id": "upsert-indicators",
-      "name": "Inserir/Atualizar Indicadores",
+      "id": "upsert-indicator-value",
+      "name": "Upsert Indicator Value",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [1760, 300],
+      "typeVersion": 2.4,
+      "position": [2220, 300],
       "credentials": {
         "postgres": {
-          "id": "postgres-credentials",
+          "id": "supabase-postgres",
           "name": "Supabase PostgreSQL"
         }
-      }
+      },
+      "notes": "Insere ou atualiza valor na tabela indicator_values\nUpsert: evita duplicatas"
     },
     {
       "parameters": {
-        "operation": "insert",
-        "table": "collection_logs",
-        "columns": "job_id, log_level, message, details",
-        "options": {}
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Atualizar dictionary após coleta bem-sucedida\nconst insertedRecords = $input.all();\n\nif (insertedRecords.length === 0) {\n  return [];\n}\n\n// Agrupar por indicator_code\nconst indicatorUpdates = {};\n\nfor (const record of insertedRecords) {\n  const data = record.json;\n  const indicatorCode = $('Parse Response').item.json.indicator_code;\n  const year = data.year;\n  \n  if (!indicatorUpdates[indicatorCode]) {\n    indicatorUpdates[indicatorCode] = {\n      code: indicatorCode,\n      max_year: year\n    };\n  } else if (year > indicatorUpdates[indicatorCode].max_year) {\n    indicatorUpdates[indicatorCode].max_year = year;\n  }\n}\n\nreturn Object.values(indicatorUpdates);"
       },
-      "id": "log-progress",
-      "name": "Registrar Progresso",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [1760, 480],
-      "credentials": {
-        "postgres": {
-          "id": "postgres-credentials",
-          "name": "Supabase PostgreSQL"
-        }
-      }
+      "id": "prepare-dictionary-update",
+      "name": "Prepare Dictionary Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2440, 300],
+      "notes": "Agrupa registros inseridos por indicador\nPrepara atualização do dictionary"
     },
     {
       "parameters": {
-        "operation": "update",
-        "table": "collection_jobs",
-        "columns": "status, completed_at, records_collected",
-        "updateKey": "id",
+        "operation": "executeQuery",
+        "query": "-- Atualizar dictionary com data da última coleta\nUPDATE indicator_dictionary\nSET \n  last_ref_date = make_date($2::integer, 12, 31),\n  last_update_date = NOW()\nWHERE code = $1\nRETURNING code, last_ref_date, last_update_date;",
         "options": {}
       },
-      "id": "finalize-job",
-      "name": "Finalizar Job",
+      "id": "update-dictionary",
+      "name": "Update Dictionary",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [1980, 300],
+      "typeVersion": 2.4,
+      "position": [2660, 300],
       "credentials": {
         "postgres": {
-          "id": "postgres-credentials",
+          "id": "supabase-postgres",
           "name": "Supabase PostgreSQL"
         }
-      }
+      },
+      "notes": "Atualiza last_ref_date e last_update_date no dictionary"
     },
     {
       "parameters": {
-        "operation": "update",
-        "table": "data_sources",
-        "columns": "last_collection_at",
-        "updateKey": "id",
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Consolidar resultados finais\nconst allInsertions = $('Upsert Indicator Value').all();\nconst dictionaryUpdates = $input.all();\nconst startTime = $('Validate Payload').first().json.start_time;\nconst endTime = new Date().toISOString();\n\nconst summary = {\n  source: 'IBGE Sidra',\n  start_time: startTime,\n  end_time: endTime,\n  duration_ms: new Date(endTime) - new Date(startTime),\n  records_inserted: allInsertions.length,\n  indicators_updated: dictionaryUpdates.length,\n  status: 'completed'\n};\n\nconsole.log('[IBGE] 📊 Resumo da Coleta:');\nconsole.log(`  Registros inseridos: ${summary.records_inserted}`);\nconsole.log(`  Indicadores atualizados: ${summary.indicators_updated}`);\nconsole.log(`  Duração: ${(summary.duration_ms / 1000).toFixed(2)}s`);\nconsole.log('[IBGE] ✅ Coleta concluída');\n\nreturn [summary];"
+      },
+      "id": "consolidate-summary",
+      "name": "Consolidate Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2880, 300],
+      "notes": "Consolida resultados finais\nGera resumo da coleta"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
         "options": {}
       },
-      "id": "update-source",
-      "name": "Atualizar Fonte",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [2200, 300],
-      "credentials": {
-        "postgres": {
-          "id": "postgres-credentials",
-          "name": "Supabase PostgreSQL"
-        }
-      }
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3100, 300],
+      "notes": "Retorna resumo ao orquestrador"
     }
   ],
   "connections": {
-    "Agendamento Mensal": {
-      "main": [
-        [
-          {
-            "node": "Buscar Config Fonte",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Webhook Trigger": {
+      "main": [[{"node": "Validate Payload", "type": "main", "index": 0}]]
     },
-    "Buscar Config Fonte": {
-      "main": [
-        [
-          {
-            "node": "Criar Job de Coleta",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Validate Payload": {
+      "main": [[{"node": "Get Municipalities", "type": "main", "index": 0}]]
     },
-    "Criar Job de Coleta": {
-      "main": [
-        [
-          {
-            "node": "Listar Municípios",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Get Municipalities": {
+      "main": [[{"node": "Set Indicators Context", "type": "main", "index": 0}]]
     },
-    "Listar Municípios": {
-      "main": [
-        [
-          {
-            "node": "Processar em Lotes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Set Indicators Context": {
+      "main": [[{"node": "Batch Municipalities", "type": "main", "index": 0}]]
     },
-    "Processar em Lotes": {
-      "main": [
-        [
-          {
-            "node": "Buscar PIB Municipal",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Buscar População",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Batch Municipalities": {
+      "main": [[{"node": "Prepare Indicator Loop", "type": "main", "index": 0}]]
     },
-    "Buscar PIB Municipal": {
-      "main": [
-        [
-          {
-            "node": "Processar Dados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Prepare Indicator Loop": {
+      "main": [[{"node": "Build API URLs", "type": "main", "index": 0}]]
     },
-    "Buscar População": {
-      "main": [
-        [
-          {
-            "node": "Processar Dados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Build API URLs": {
+      "main": [[{"node": "Call IBGE API", "type": "main", "index": 0}]]
     },
-    "Processar Dados": {
-      "main": [
-        [
-          {
-            "node": "Inserir/Atualizar Indicadores",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Call IBGE API": {
+      "main": [[{"node": "Parse Response", "type": "main", "index": 0}]]
     },
-    "Inserir/Atualizar Indicadores": {
-      "main": [
-        [
-          {
-            "node": "Registrar Progresso",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Finalizar Job",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Parse Response": {
+      "main": [[{"node": "Upsert Indicator Value", "type": "main", "index": 0}]]
     },
-    "Finalizar Job": {
-      "main": [
-        [
-          {
-            "node": "Atualizar Fonte",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Upsert Indicator Value": {
+      "main": [[{"node": "Prepare Dictionary Update", "type": "main", "index": 0}]]
+    },
+    "Prepare Dictionary Update": {
+      "main": [[{"node": "Update Dictionary", "type": "main", "index": 0}]]
+    },
+    "Update Dictionary": {
+      "main": [[{"node": "Consolidate Summary", "type": "main", "index": 0}]]
+    },
+    "Consolidate Summary": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "tags": [
-    {
-      "name": "tocantins-integrado"
-    },
-    {
-      "name": "data-collection"
-    },
-    {
-      "name": "ibge"
-    }
-  ]
+  "settings": {"executionOrder": "v1"},
+  "staticData": null,
+  "tags": [{"name": "tocantins-integrado"}, {"name": "data-collection"}, {"name": "ibge"}],
+  "pinData": {},
+  "meta": {"instanceId": "n8n-cloud"}
 }

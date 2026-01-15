@@ -1,0 +1,54 @@
+{
+  "name": "Data Collection - INEP",
+  "nodes": [
+    {
+      "parameters": {"httpMethod": "POST", "path": "data-collection-inep", "responseMode": "responseNode"},
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Recebe payload do orquestrador com indicadores INEP (educação)"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const payload = $json.body || $json;\nconsole.log(`[INEP] Iniciando coleta de ${payload.indicators.length} indicadores`);\nreturn [{...payload, start_time: new Date().toISOString()}];"
+      },
+      "id": "validate-payload",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "notes": "Valida payload e inicia processo"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// INEP: Coleta manual ou via dados abertos\n// Este é um placeholder para implementação futura\nconsole.log('[INEP] ⚠️  Coleta INEP requer implementação de scraping ou dados abertos');\nconsole.log('[INEP] Indicadores recebidos:', $json.indicators.map(i => i.code));\n\nconst summary = {\n  source: 'INEP',\n  status: 'not_implemented',\n  message: 'INEP collection requires manual data import or scraping implementation',\n  indicators_received: $json.indicators.length,\n  next_steps: [\n    'Download microdados INEP',\n    'Process CSV files',\n    'Import to database'\n  ]\n};\n\nreturn [summary];"
+      },
+      "id": "inep-placeholder",
+      "name": "INEP Placeholder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "notes": "Placeholder: INEP requer dados abertos (download manual)\nImplementar quando arquivos estiverem disponíveis"
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={{ JSON.stringify($json) }}"},
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {"main": [[{"node": "Validate Payload"}]]},
+    "Validate Payload": {"main": [[{"node": "INEP Placeholder"}]]},
+    "INEP Placeholder": {"main": [[{"node": "Respond to Webhook"}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "tocantins-integrado"}, {"name": "data-collection"}, {"name": "inep"}],
+  "meta": {"instanceId": "n8n-cloud"}
+}
