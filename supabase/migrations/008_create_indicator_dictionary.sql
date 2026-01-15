@@ -289,8 +289,8 @@ SELECT
     source_name,
     COUNT(*) as total_indicators,
     COUNT(*) FILTER (WHERE is_active = true) as active_indicators,
-    array_agg(DISTINCT dimension::text ORDER BY dimension) as dimensions,
-    string_agg(DISTINCT collection_method, ', ' ORDER BY collection_method) as methods,
+    array_agg(DISTINCT dimension::text) as dimensions,
+    string_agg(DISTINCT collection_method, ', ') as methods,
     COUNT(*) FILTER (WHERE api_endpoint IS NOT NULL) as with_api
 FROM indicator_dictionary
 GROUP BY source_name
