@@ -41,6 +41,8 @@ Este diretório contém os registros de todas as sessões de trabalho do projeto
 | Sessão | Data | Foco Principal | Arquivo |
 | :--- | :--- | :--- | :--- |
 | #16 | 05/01/2026 | Reinício com Sistema PSB | [2026-01-05_sessao-16.md](2026-01-05_sessao-16.md) |
+| #17 | 08/01/2026 | Operacionalização da Governança CIG | [2026-01-08_sessao-17.md](2026-01-08_sessao-17.md) |
+| #18 | 15/01/2026 | Integração de Código e Implantação de Workflows | [2026-01-15_sessao-18.md](2026-01-15_sessao-18.md) |
 
 ---
 
@@ -54,4 +56,4 @@ Documentos complementares estão disponíveis em [`../auxiliary/`](../auxiliary/
 
 ---
 
-**Total de Sessões Documentadas:** 15 (+ sessão atual #16)
+**Total de Sessões Documentadas:** 18
