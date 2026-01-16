@@ -91,14 +91,14 @@ Análises geradas periodicamente pelos workflows n8n e armazenadas para acesso i
 
 **Localização:** `n8n/workflows/`
 
-#### 3.1 Orquestrador (`orchestrator.json`)
+#### 3.1 Orquestrador de Análise (`analysis-orchestrator.json`)
 
-Recebe consultas complexas e coordena os agentes especialistas.
+Recebe consultas complexas e coordena os agentes especialistas de análise.
 
 **Fluxo:**
 1. Webhook recebe a consulta
 2. LLM classifica a consulta (dimensões, tipo, entidades)
-3. Roteia para os agentes relevantes
+3. Roteia para os agentes relevantes (ECON, SOCIAL, TERRA, AMBIENT)
 4. Consolida respostas dos agentes
 5. Retorna resposta integrada
 
@@ -119,7 +119,75 @@ Cada dimensão possui um agente especialista:
 5. Análise com GPT-4
 6. Formatação da resposta
 
-#### 3.3 Coleta de Dados (`data-collection-ibge.json`)
+#### 3.3 Orquestrador de Coleta (`data-collection-orchestrator.json`)
+
+Coordena a coleta automatizada de indicadores de forma metadata-driven.
+
+**Agendamento:** Diário às 3h
+
+**Fluxo:**
+1. Consulta `v_indicators_pending_collection` (indicadores que precisam atualização)
+2. Agrupa indicadores por `source_name` (IBGE Sidra, INEP, MapBiomas, etc.)
+3. Para cada fonte, chama o workflow especialista correspondente via webhook
+4. Passa lista de indicadores com metadados de coleta (api_endpoint, api_params)
+5. Consolida resultados de todos os especialistas
+6. Registra logs e estatísticas de execução
+
+**Mapeamento fonte → workflow:**
+- `IBGE Sidra` → `data-collection-ibge.json`
+- `INEP` → `data-collection-inep.json` (placeholder)
+- `MapBiomas` → `data-collection-mapbiomas.json` (placeholder)
+
+**Documentação:**
+- [ADR 004 - Sistema de Coleta Orientado a Metadados](../../adr/004-sistema-coleta-orientado-metadados.md)
+- [Guia de Setup dos Workflows](../../guides/workflows-n8n-setup.md)
+- [Guia de Configuração da Coleta](../../guides/data-collection-setup.md)
+
+#### 3.4 Workflows Especialistas de Coleta
+
+##### 3.4.1 IBGE Specialist (`data-collection-ibge.json`)
+
+**Status:** ✅ Implementado e funcional
+
+**Trigger:** Webhook (chamado pelo orquestrador de coleta)
+
+**Payload recebido:**
+```json
+{
+  "source_name": "IBGE Sidra",
+  "orchestrator_run_id": "uuid",
+  "indicators": [
+    {
+      "code": "ECON_PIB_TOTAL",
+      "api_endpoint": "https://apisidra.ibge.gov.br/values/t/5938/n6/{ibge_code}/v/allxp/p/last"
+    }
+  ]
+}
+```
+
+**Fluxo:**
+1. Recebe lista de indicadores com metadados de API
+2. Busca todos os 139 municípios do Tocantins
+3. Para cada município e indicador:
+   - Constrói URL substituindo `{ibge_code}` pelo código IBGE do município
+   - Chama API IBGE Sidra
+   - Parseia resposta JSON
+   - UPSERT em `indicator_values` (evita duplicatas)
+4. Atualiza `indicator_dictionary` com `last_ref_date` e `last_update_date`
+5. Retorna resumo: total processado, sucessos, erros
+
+**Indicadores coletados:**
+- PIB Municipal Total e per capita
+- Valor Adicionado por setor (Agropecuária, Indústria, Serviços)
+- População estimada
+
+##### 3.4.2 INEP e MapBiomas
+
+**Status:** ⏳ Placeholders implementados
+
+Workflows retornam `status: "not_implemented"` sem causar erros no orquestrador. Serão implementados em ciclos futuros quando houver necessidade de coleta dessas fontes.
+
+#### 3.5 Coleta de Dados (Legacy - `data-collection-ibge.json` antigo)
 
 **Agendamento:** Mensal (dia 1, às 3h)
 
@@ -202,22 +270,32 @@ Usuário → Dashboard → API → n8n Webhook → Orquestrador
                           ~5-15 segundos total
 ```
 
-### 3. Coleta Automatizada
+### 3. Coleta Automatizada (Metadata-Driven)
 
 ```
-Cron (mensal) → n8n Workflow → APIs Externas
-                                    │
-                                    ▼
-                            Processamento
-                                    │
-                                    ▼
-                        Banco de Indicadores
-                                    │
-                                    ▼
-                        Trigger de Atualização
-                                    │
-                                    ▼
-                        Invalidação de Cache
+Cron (diário 3h) → Orquestrador de Coleta
+                         │
+                         ▼
+               Consulta indicator_dictionary
+            (v_indicators_pending_collection)
+                         │
+            ┌────────────┼────────────┐
+            ▼            ▼            ▼
+      Workflow IBGE  Workflow INEP  Workflow MapBiomas
+            │            │            │
+            ▼            ▼            ▼
+      Construção dinâmica de URLs via metadados
+            │            │            │
+            ▼            ▼            ▼
+        APIs Externas (IBGE Sidra, INEP, etc.)
+            │            │            │
+            └────────────┼────────────┘
+                         ▼
+              UPSERT indicator_values
+                         │
+                         ▼
+         Atualização indicator_dictionary
+              (last_ref_date, last_update_date)
 ```
 
 ## Estrutura de Diretórios
@@ -248,15 +326,22 @@ tocantins-integrado/
 │   │   │   ├── 004_views_and_functions.sql
 │   │   │   ├── 005_precomputed_analyses.sql
 │   │   │   ├── 006_knowledge_base.sql
-│   │   │   └── 007_data_collection.sql
+│   │   │   ├── 007_data_collection.sql
+│   │   │   └── 008_create_indicator_dictionary.sql
 │   │   └── seeds/
 │   └── integrations/           # Integrações externas
 │       └── whatsapp/
 ├── n8n/
 │   └── workflows/              # Workflows n8n (JSON)
-│       ├── orchestrator.json
+│       ├── analysis-orchestrator.json
+│       ├── data-collection-orchestrator.json
 │       ├── agent-econ.json
-│       └── data-collection-ibge.json
+│       ├── agent-social.json
+│       ├── agent-terra.json
+│       ├── agent-ambient.json
+│       ├── data-collection-ibge.json
+│       ├── data-collection-inep.json
+│       └── data-collection-mapbiomas.json
 ├── docs/
 │   ├── 00-project/
 │   │   └── PRD.md

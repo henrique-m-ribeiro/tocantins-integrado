@@ -40,7 +40,12 @@ O **Tocantins Integrado** é um sistema de inteligência artificial que fornece 
 ┌─────────────────────────────────────────────────────────────┐
 │                  CAMADA DE ORQUESTRAÇÃO                      │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │              Agente Orquestrador (n8n)               │    │
+│  │     Orquestrador de Análise (n8n)                   │    │
+│  │     Classifica consultas, chama agentes, consolida  │    │
+│  └─────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Orquestrador de Coleta (n8n)                       │    │
+│  │  Execução diária, coleta indicadores via metadados  │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
             │
@@ -167,6 +172,28 @@ O sistema utiliza dados públicos de fontes oficiais:
 - INEP (Censo Escolar)
 - DATASUS (Indicadores de Saúde)
 - Tesouro Nacional (Finanças Públicas)
+
+## 🔄 Sistema de Coleta Automatizada
+
+O sistema utiliza arquitetura **metadata-driven** para coleta escalável de indicadores:
+
+| Componente | Descrição |
+| :--- | :--- |
+| **Indicator Dictionary** | Tabela central com 55+ indicadores e metadados de coleta (API endpoints, parâmetros, periodicidade) |
+| **Orquestrador de Coleta** | Execução diária às 3h, identifica indicadores pendentes via `v_indicators_pending_collection` |
+| **Workflows Especialistas** | IBGE, INEP, MapBiomas - constroem URLs dinamicamente a partir dos metadados |
+| **Coleta Dinâmica** | Adicionar novo indicador = 1 INSERT no dictionary (sem alterar código dos workflows) |
+
+**Vantagens da abordagem:**
+- ✅ Escalável: de 2 para 55+ indicadores sem reescrever workflows
+- ✅ Manutenível: metadados centralizados em uma tabela
+- ✅ Auditável: `last_ref_date` e `last_update_date` por indicador
+- ✅ Flexível: diferentes periodicidades (mensal, anual, sob demanda)
+
+**Documentação técnica:**
+- [ADR 004 - Sistema de Coleta Orientado a Metadados](docs/adr/004-sistema-coleta-orientado-metadados.md)
+- [Guia de Setup dos Workflows](docs/guides/workflows-n8n-setup.md)
+- [Guia de Configuração da Coleta](docs/guides/data-collection-setup.md)
 
 ## 📜 Licença
 

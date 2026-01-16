@@ -14,7 +14,7 @@ Os agentes dimensionais são componentes de IA especializados em analisar indica
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      ORQUESTRADOR                           │
+│              ORQUESTRADOR DE ANÁLISE                        │
 │              Coordena análises multidimensionais            │
 └───────────────────────────┬─────────────────────────────────┘
                             │
@@ -32,6 +32,15 @@ Os agentes dimensionais são componentes de IA especializados em analisar indica
                    │Meio Ambiente  │
                    └───────────────┘
 ```
+
+> **Nota:** Este é o **Orquestrador de Análise** (`analysis-orchestrator.json`).
+> Existe um segundo orquestrador separado para coleta de dados (`data-collection-orchestrator.json`)
+> que dispara workflows especialistas para atualizar indicadores automaticamente.
+>
+> **Documentação relacionada:**
+> - [ARCHITECTURE.md](../ARCHITECTURE.md) - Arquitetura completa do sistema
+> - [ADR 004](../../adr/004-sistema-coleta-orientado-metadados.md) - Sistema de coleta metadata-driven
+> - [Guia de Setup dos Workflows](../../guides/workflows-n8n-setup.md) - Configuração dos workflows n8n
 
 ---
 
