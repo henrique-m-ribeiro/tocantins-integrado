@@ -1,0 +1,140 @@
+municipio_id,municipio_nome,microrregiao_id,microrregiao_nome,mesorregiao_id,mesorregiao_nome,regiao_imediata_id,regiao_imediata_nome,regiao_intermediaria_id,regiao_intermediaria_nome
+1700251,Abreulândia,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1700301,Aguiarnópolis,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170008,Tocantinópolis,1702,Araguaína
+1700350,Aliança do Tocantins,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1700400,Almas,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1700707,Alvorada,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1701002,Ananás,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1701051,Angico,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1701101,Aparecida do Rio Negro,17006,Porto Nacional,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1701309,Aragominas,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1701903,Araguacema,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1702000,Araguaçu,17004,Rio Formoso,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1702109,Araguaína,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1702158,Araguanã,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1702208,Araguatins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1702307,Arapoema,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1702406,Arraias,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1702554,Augustinópolis,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1702703,Aurora do Tocantins,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1702901,Axixá do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1703008,Babaçulândia,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1703057,Bandeirantes do Tocantins,17002,Araguaína,1701,Ocidental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1703073,Barra do Ouro,17007,Jalapão,1702,Oriental do Tocantins,170005,Araguaína,1702,Araguaína
+1703107,Barrolândia,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1703206,Bernardo Sayão,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1703305,Bom Jesus do Tocantins,17006,Porto Nacional,1702,Oriental do Tocantins,170006,Guaraí,1702,Araguaína
+1703602,Brasilândia do Tocantins,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1703701,Brejinho de Nazaré,17005,Gurupi,1701,Ocidental do Tocantins,170002,Porto Nacional,1701,Palmas
+1703800,Buriti do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1703826,Cachoeirinha,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170008,Tocantinópolis,1702,Araguaína
+1703842,Campos Lindos,17007,Jalapão,1702,Oriental do Tocantins,170005,Araguaína,1702,Araguaína
+1703867,Cariri do Tocantins,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1703883,Carmolândia,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1703891,Carrasco Bonito,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1703909,Caseara,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1704105,Centenário,17007,Jalapão,1702,Oriental do Tocantins,170006,Guaraí,1702,Araguaína
+1704600,Chapada de Areia,17004,Rio Formoso,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1705102,Chapada da Natividade,17008,Dianópolis,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1705508,Colinas do Tocantins,17002,Araguaína,1701,Ocidental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1705557,Combinado,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1705607,Conceição do Tocantins,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1706001,Couto Magalhães,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1706100,Cristalândia,17004,Rio Formoso,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1706258,Crixás do Tocantins,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1706506,Darcinópolis,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1707009,Dianópolis,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1707108,Divinópolis do Tocantins,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1707207,Dois Irmãos do Tocantins,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170004,Miracema do Tocantins,1701,Palmas
+1707306,Dueré,17004,Rio Formoso,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1707405,Esperantina,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1707553,Fátima,17004,Rio Formoso,1701,Ocidental do Tocantins,170002,Porto Nacional,1701,Palmas
+1707652,Figueirópolis,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1707702,Filadélfia,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1708205,Formoso do Araguaia,17004,Rio Formoso,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1708254,Tabocão,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1708304,Goianorte,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1709005,Goiatins,17007,Jalapão,1702,Oriental do Tocantins,170005,Araguaína,1702,Araguaína
+1709302,Guaraí,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1709500,Gurupi,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1709807,Ipueiras,17006,Porto Nacional,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1710508,Itacajá,17007,Jalapão,1702,Oriental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1710706,Itaguatins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1710904,Itapiratins,17007,Jalapão,1702,Oriental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1711100,Itaporã do Tocantins,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1711506,Jaú do Tocantins,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1711803,Juarina,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1711902,Lagoa da Confusão,17004,Rio Formoso,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1711951,Lagoa do Tocantins,17007,Jalapão,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1712009,Lajeado,17006,Porto Nacional,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1712157,Lavandeira,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1712405,Lizarda,17007,Jalapão,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1712454,Luzinópolis,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170008,Tocantinópolis,1702,Araguaína
+1712504,Marianópolis do Tocantins,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1712702,Mateiros,17007,Jalapão,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1712801,Maurilândia do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170008,Tocantinópolis,1702,Araguaína
+1713205,Miracema do Tocantins,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170004,Miracema do Tocantins,1701,Palmas
+1713304,Miranorte,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170004,Miracema do Tocantins,1701,Palmas
+1713601,Monte do Carmo,17006,Porto Nacional,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1713700,Monte Santo do Tocantins,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1713809,Palmeiras do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170008,Tocantinópolis,1702,Araguaína
+1713957,Muricilândia,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1714203,Natividade,17008,Dianópolis,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1714302,Nazaré,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170008,Tocantinópolis,1702,Araguaína
+1714880,Nova Olinda,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1715002,Nova Rosalândia,17004,Rio Formoso,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1715101,Novo Acordo,17007,Jalapão,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1715150,Novo Alegre,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1715259,Novo Jardim,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1715507,Oliveira de Fátima,17004,Rio Formoso,1701,Ocidental do Tocantins,170002,Porto Nacional,1701,Palmas
+1715705,Palmeirante,17002,Araguaína,1701,Ocidental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1715754,Palmeirópolis,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1716109,Paraíso do Tocantins,17004,Rio Formoso,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1716208,Paranã,17008,Dianópolis,1702,Oriental do Tocantins,170010,Gurupi,1703,Gurupi
+1716307,Pau D'Arco,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1716505,Pedro Afonso,17006,Porto Nacional,1702,Oriental do Tocantins,170006,Guaraí,1702,Araguaína
+1716604,Peixe,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1716653,Pequizeiro,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1716703,Colméia,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1717008,Pindorama do Tocantins,17008,Dianópolis,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1717206,Piraquê,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1717503,Pium,17004,Rio Formoso,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1717800,Ponte Alta do Bom Jesus,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1717909,Ponte Alta do Tocantins,17007,Jalapão,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1718006,Porto Alegre do Tocantins,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1718204,Porto Nacional,17006,Porto Nacional,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1718303,Praia Norte,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1718402,Presidente Kennedy,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1718451,Pugmil,17004,Rio Formoso,1701,Ocidental do Tocantins,170003,Paraíso do Tocantins,1701,Palmas
+1718501,Recursolândia,17007,Jalapão,1702,Oriental do Tocantins,170006,Guaraí,1702,Araguaína
+1718550,Riachinho,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1718659,Rio da Conceição,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1718709,Rio dos Bois,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170004,Miracema do Tocantins,1701,Palmas
+1718758,Rio Sono,17007,Jalapão,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1718808,Sampaio,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1718840,Sandolândia,17004,Rio Formoso,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1718865,Santa Fé do Araguaia,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1718881,Santa Maria do Tocantins,17006,Porto Nacional,1702,Oriental do Tocantins,170006,Guaraí,1702,Araguaína
+1718899,Santa Rita do Tocantins,17005,Gurupi,1701,Ocidental do Tocantins,170002,Porto Nacional,1701,Palmas
+1718907,Santa Rosa do Tocantins,17008,Dianópolis,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1719004,Santa Tereza do Tocantins,17007,Jalapão,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1720002,Santa Terezinha do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170008,Tocantinópolis,1702,Araguaína
+1720101,São Bento do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1720150,São Félix do Tocantins,17007,Jalapão,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1720200,São Miguel do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1720259,São Salvador do Tocantins,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1720309,São Sebastião do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1720499,São Valério,17008,Dianópolis,1702,Oriental do Tocantins,170010,Gurupi,1703,Gurupi
+1720655,Silvanópolis,17006,Porto Nacional,1702,Oriental do Tocantins,170002,Porto Nacional,1701,Palmas
+1720804,Sítio Novo do Tocantins,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170009,Araguatins,1702,Araguaína
+1720853,Sucupira,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1720903,Taguatinga,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1720937,Taipas do Tocantins,17008,Dianópolis,1702,Oriental do Tocantins,170011,Dianópolis,1703,Gurupi
+1720978,Talismã,17005,Gurupi,1701,Ocidental do Tocantins,170010,Gurupi,1703,Gurupi
+1721000,Palmas,17006,Porto Nacional,1702,Oriental do Tocantins,170001,Palmas,1701,Palmas
+1721109,Tocantínia,17006,Porto Nacional,1702,Oriental do Tocantins,170004,Miracema do Tocantins,1701,Palmas
+1721208,Tocantinópolis,17001,Bico do Papagaio,1701,Ocidental do Tocantins,170008,Tocantinópolis,1702,Araguaína
+1721257,Tupirama,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170006,Guaraí,1702,Araguaína
+1721307,Tupiratins,17003,Miracema do Tocantins,1701,Ocidental do Tocantins,170007,Colinas do Tocantins,1702,Araguaína
+1722081,Wanderlândia,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
+1722107,Xambioá,17002,Araguaína,1701,Ocidental do Tocantins,170005,Araguaína,1702,Araguaína
