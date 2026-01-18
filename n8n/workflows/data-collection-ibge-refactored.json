@@ -1,0 +1,289 @@
+{
+  "name": "Data Collection - IBGE Sidra",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "data-collection-ibge",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "data-collection-ibge",
+      "notes": "Recebe payload do orquestrador com lista de indicadores IBGE"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log início e validar payload\nconst payload = $json.body || $json;\n\nif (!payload.indicators || payload.indicators.length === 0) {\n  throw new Error('Payload inválido: indicators não encontrado');\n}\n\nconsole.log(`[IBGE] Iniciando coleta de ${payload.indicators.length} indicadores`);\nconsole.log(`[IBGE] Run ID: ${payload.orchestrator_run_id}`);\n\nreturn [{\n  ...payload,\n  start_time: new Date().toISOString()\n}];"
+      },
+      "id": "validate-payload",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "notes": "Valida payload recebido e extrai lista de indicadores"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, ibge_code, name \nFROM territories \nWHERE type = 'municipio' \nORDER BY name",
+        "options": {}
+      },
+      "id": "get-territories",
+      "name": "Get Territories",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [680, 300],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-postgres",
+          "name": "Supabase PostgreSQL"
+        }
+      },
+      "notes": "Busca todos os 139 municípios do Tocantins\nATUALIZADO: usa tabela territories em vez de municipalities"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "indicator-0",
+              "name": "indicators",
+              "value": "={{ $('Validate Payload').first().json.indicators }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-indicators",
+      "name": "Set Indicators Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [900, 300],
+      "notes": "Preserva lista de indicadores no contexto"
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "batch-territories",
+      "name": "Batch Territories",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1120, 300],
+      "notes": "Processa 10 territórios por vez para evitar sobrecarga\nRENOMEADO: de Batch Municipalities para Batch Territories"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "indicator-loop",
+              "name": "indicators_to_collect",
+              "value": "={{ $('Set Indicators Context').first().json.indicators }}",
+              "type": "array"
+            },
+            {
+              "id": "territory",
+              "name": "territory",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-indicator-loop",
+      "name": "Prepare Indicator Loop",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1340, 300],
+      "notes": "Prepara para loop de indicadores para cada território\nATUALIZADO: renomeado municipality para territory"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Construir URLs da API IBGE Sidra para cada indicador\nconst indicators = $json.indicators_to_collect;\nconst territory = $json.territory;\n\nconst apiCalls = [];\n\nfor (const indicator of indicators) {\n  let url = indicator.api_endpoint;\n  \n  // Substituir placeholders\n  url = url.replace('{ibge_code}', territory.ibge_code);\n  \n  apiCalls.push({\n    indicator_code: indicator.code,\n    indicator_name: indicator.name,\n    territory_id: territory.id,\n    territory_ibge: territory.ibge_code,\n    territory_name: territory.name,\n    url: url\n  });\n}\n\nreturn apiCalls;"
+      },
+      "id": "build-api-urls",
+      "name": "Build API URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300],
+      "notes": "Constrói URLs da API IBGE Sidra dinamicamente\nUm URL por indicador por território\nATUALIZADO: usa territory_id em vez de municipality_id"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "call-ibge-api",
+      "name": "Call IBGE API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300],
+      "notes": "Chama API IBGE Sidra\nneverError: true para não parar em erros individuais"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Processar resposta da API IBGE Sidra\nconst response = $json;\nconst metadata = $('Build API URLs').item.json;\n\n// Verificar se resposta é válida\nif (!response || typeof response !== 'object' || response.error) {\n  console.warn(`[IBGE] ⚠️  Erro na API para ${metadata.indicator_code} em ${metadata.territory_name}`);\n  return [];\n}\n\n// API Sidra retorna array: [header, data, ...]\nlet data;\nif (Array.isArray(response) && response.length > 1) {\n  data = response[1]; // Segundo elemento tem os dados\n} else if (Array.isArray(response) && response.length === 1) {\n  return []; // Sem dados\n} else {\n  data = response;\n}\n\n// Extrair valor e ano\nlet value, year;\n\nif (data.V) {\n  value = parseFloat(data.V.toString().replace(',', '.'));\n}\n\nif (data.D3N) {\n  year = parseInt(data.D3N);\n} else if (data.D2N) {\n  year = parseInt(data.D2N);\n}\n\nif (isNaN(value) || isNaN(year)) {\n  console.warn(`[IBGE] ⚠️  Dados inválidos para ${metadata.indicator_code}`);\n  return [];\n}\n\nconsole.log(`[IBGE] ✓ ${metadata.territory_name}: ${metadata.indicator_code} = ${value} (${year})`);\n\nreturn [{\n  indicator_code: metadata.indicator_code,\n  territory_id: metadata.territory_id,\n  year: year,\n  value: value,\n  aggregation_method: 'raw',\n  is_aggregated: false,\n  data_quality: 'official',\n  notes: `Coletado automaticamente via IBGE Sidra API em ${new Date().toISOString()}`\n}];"
+      },
+      "id": "parse-response",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300],
+      "notes": "Parseia resposta JSON da API IBGE\nExtrai valor e ano de referência\nATUALIZADO: usa territory_id e adiciona aggregation_method"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Inserir ou atualizar valor do indicador\n-- ATUALIZADO: usa territory_id em vez de municipality_id\nINSERT INTO indicator_values (\n  indicator_id,\n  territory_id,\n  year,\n  value,\n  aggregation_method,\n  is_aggregated,\n  data_quality,\n  notes\n)\nSELECT \n  id.id,\n  $2::uuid,\n  $3::integer,\n  $4::decimal,\n  $5::text,\n  $6::boolean,\n  $7::varchar,\n  $8::text\nFROM indicator_definitions id\nWHERE id.code = $1\nON CONFLICT (indicator_id, territory_id, year, month) \nDO UPDATE SET \n  value = EXCLUDED.value,\n  aggregation_method = EXCLUDED.aggregation_method,\n  is_aggregated = EXCLUDED.is_aggregated,\n  data_quality = EXCLUDED.data_quality,\n  notes = EXCLUDED.notes,\n  updated_at = NOW()\nRETURNING id, indicator_id, year, value;",
+        "options": {
+          "queryParameters": "={{ [\n  $json.indicator_code,\n  $json.territory_id,\n  $json.year,\n  $json.value,\n  $json.aggregation_method,\n  $json.is_aggregated,\n  $json.data_quality,\n  $json.notes\n] }}"
+        }
+      },
+      "id": "upsert-indicator-value",
+      "name": "Upsert Indicator Value",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2220, 300],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-postgres",
+          "name": "Supabase PostgreSQL"
+        }
+      },
+      "notes": "Insere ou atualiza valor na tabela indicator_values\nATUALIZADO: usa territory_id e novos campos (aggregation_method, is_aggregated)\nUpsert: evita duplicatas"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Atualizar dictionary após coleta bem-sucedida\nconst insertedRecords = $input.all();\n\nif (insertedRecords.length === 0) {\n  return [];\n}\n\n// Agrupar por indicator_code\nconst indicatorUpdates = {};\n\nfor (const record of insertedRecords) {\n  const data = record.json;\n  const indicatorCode = $('Parse Response').item.json.indicator_code;\n  const year = data.year;\n  \n  if (!indicatorUpdates[indicatorCode]) {\n    indicatorUpdates[indicatorCode] = {\n      code: indicatorCode,\n      max_year: year\n    };\n  } else if (year > indicatorUpdates[indicatorCode].max_year) {\n    indicatorUpdates[indicatorCode].max_year = year;\n  }\n}\n\nreturn Object.values(indicatorUpdates);"
+      },
+      "id": "prepare-dictionary-update",
+      "name": "Prepare Dictionary Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2440, 300],
+      "notes": "Agrupa registros inseridos por indicador\nPrepara atualização do dictionary"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Atualizar dictionary com data da última coleta\nUPDATE indicator_dictionary\nSET \n  last_ref_date = make_date($2::integer, 12, 31),\n  last_update_date = NOW()\nWHERE code = $1\nRETURNING code, last_ref_date, last_update_date;",
+        "options": {
+          "queryParameters": "={{ [$json.code, $json.max_year] }}"
+        }
+      },
+      "id": "update-dictionary",
+      "name": "Update Dictionary",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2660, 300],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-postgres",
+          "name": "Supabase PostgreSQL"
+        }
+      },
+      "notes": "Atualiza last_ref_date e last_update_date no dictionary"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Consolidar resultados finais\nconst allInsertions = $('Upsert Indicator Value').all();\nconst dictionaryUpdates = $input.all();\nconst startTime = $('Validate Payload').first().json.start_time;\nconst endTime = new Date().toISOString();\n\nconst summary = {\n  source: 'IBGE Sidra',\n  start_time: startTime,\n  end_time: endTime,\n  duration_ms: new Date(endTime) - new Date(startTime),\n  records_inserted: allInsertions.length,\n  indicators_updated: dictionaryUpdates.length,\n  status: 'completed',\n  schema_version: 'territories_v2'\n};\n\nconsole.log('[IBGE] 📊 Resumo da Coleta:');\nconsole.log(`  Registros inseridos: ${summary.records_inserted}`);\nconsole.log(`  Indicadores atualizados: ${summary.indicators_updated}`);\nconsole.log(`  Duração: ${(summary.duration_ms / 1000).toFixed(2)}s`);\nconsole.log(`  Schema: ${summary.schema_version} (territory_id)`);\nconsole.log('[IBGE] ✅ Coleta concluída');\n\nreturn [summary];"
+      },
+      "id": "consolidate-summary",
+      "name": "Consolidate Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2880, 300],
+      "notes": "Consolida resultados finais\nGera resumo da coleta\nATUALIZADO: adiciona schema_version para tracking"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3100, 300],
+      "notes": "Retorna resumo ao orquestrador"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Validate Payload", "type": "main", "index": 0}]]
+    },
+    "Validate Payload": {
+      "main": [[{"node": "Get Territories", "type": "main", "index": 0}]]
+    },
+    "Get Territories": {
+      "main": [[{"node": "Set Indicators Context", "type": "main", "index": 0}]]
+    },
+    "Set Indicators Context": {
+      "main": [[{"node": "Batch Territories", "type": "main", "index": 0}]]
+    },
+    "Batch Territories": {
+      "main": [[{"node": "Prepare Indicator Loop", "type": "main", "index": 0}]]
+    },
+    "Prepare Indicator Loop": {
+      "main": [[{"node": "Build API URLs", "type": "main", "index": 0}]]
+    },
+    "Build API URLs": {
+      "main": [[{"node": "Call IBGE API", "type": "main", "index": 0}]]
+    },
+    "Call IBGE API": {
+      "main": [[{"node": "Parse Response", "type": "main", "index": 0}]]
+    },
+    "Parse Response": {
+      "main": [[{"node": "Upsert Indicator Value", "type": "main", "index": 0}]]
+    },
+    "Upsert Indicator Value": {
+      "main": [[{"node": "Prepare Dictionary Update", "type": "main", "index": 0}]]
+    },
+    "Prepare Dictionary Update": {
+      "main": [[{"node": "Update Dictionary", "type": "main", "index": 0}]]
+    },
+    "Update Dictionary": {
+      "main": [[{"node": "Consolidate Summary", "type": "main", "index": 0}]]
+    },
+    "Consolidate Summary": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"},
+  "staticData": null,
+  "tags": [
+    {"name": "tocantins-integrado"},
+    {"name": "data-collection"},
+    {"name": "ibge"},
+    {"name": "refactored-v2"}
+  ],
+  "pinData": {},
+  "meta": {
+    "instanceId": "n8n-cloud",
+    "templateCredsSetupCompleted": true,
+    "templateId": "tocantins-ibge-territories-v2"
+  }
+}
