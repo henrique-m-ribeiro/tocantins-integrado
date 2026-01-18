@@ -455,9 +455,10 @@ CREATE INDEX IF NOT EXISTS idx_indicator_values_timeseries
 ON indicator_values (indicator_id, territory_id, year DESC, month DESC);
 
 -- Índice parcial para dados recentes (mais consultados)
+-- Nota: Usando valor fixo pois CURRENT_DATE não é IMMUTABLE
 CREATE INDEX IF NOT EXISTS idx_indicator_values_recent
 ON indicator_values (indicator_id, territory_id, year DESC, month DESC)
-WHERE year >= EXTRACT(YEAR FROM CURRENT_DATE) - 10;
+WHERE year >= 2015;
 
 -- 6.10. Adicionar constraint de unicidade (incluir territory_id)
 -- NOTA: Manter municipality_id temporariamente para compatibilidade
