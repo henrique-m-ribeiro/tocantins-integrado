@@ -1,0 +1,54 @@
+{
+  "name": "Data Collection - INEP",
+  "nodes": [
+    {
+      "parameters": {"httpMethod": "POST", "path": "data-collection-inep", "responseMode": "responseNode"},
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Recebe payload do orquestrador com indicadores INEP (educação)\nNOVO SCHEMA: Usa territory_id em vez de municipality_id"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const payload = $json.body || $json;\nconsole.log(`[INEP] Iniciando coleta de ${payload.indicators.length} indicadores`);\nreturn [{...payload, start_time: new Date().toISOString()}];"
+      },
+      "id": "validate-payload",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "notes": "Valida payload e inicia processo"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// INEP: Coleta manual ou via dados abertos\n// Este é um placeholder para implementação futura\nconsole.log('[INEP] ⚠️  Coleta INEP requer implementação de scraping ou dados abertos');\nconsole.log('[INEP] Indicadores recebidos:', $json.indicators.map(i => i.code));\n\n// IMPORTANTE: Quando implementar, use o NOVO SCHEMA DE TERRITÓRIOS\n// Exemplo de INSERT com territory_id:\n//\n// INSERT INTO indicator_values (\n//   indicator_id,\n//   territory_id,          -- NOVO: usar territory_id (UUID)\n//   year,\n//   value,\n//   aggregation_method,    -- NOVO: obrigatório ('raw', 'sum', 'avg', etc)\n//   is_aggregated,         -- NOVO: obrigatório (boolean)\n//   data_quality,\n//   notes\n// ) VALUES (...)\n// ON CONFLICT (indicator_id, territory_id, year, month)\n// DO UPDATE SET ...\n//\n// Para obter territory_id a partir de código INEP/IBGE:\n// SELECT id FROM territories WHERE ibge_code = '1721000' AND type = 'municipio'\n\nconst summary = {\n  source: 'INEP',\n  status: 'not_implemented',\n  message: 'INEP collection requires manual data import or scraping implementation',\n  indicators_received: $json.indicators.length,\n  schema_version: 'territories_v009',\n  next_steps: [\n    'Download microdados INEP',\n    'Process CSV files',\n    'Map INEP codes to territory_id (territories table)',\n    'Import to indicator_values with territory_id, aggregation_method, is_aggregated'\n  ]\n};\n\nreturn [summary];"
+      },
+      "id": "inep-placeholder",
+      "name": "INEP Placeholder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "notes": "Placeholder: INEP requer dados abertos (download manual)\nQUANDO IMPLEMENTAR: usar territories table e territory_id"
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={{ JSON.stringify($json) }}"},
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {"main": [[{"node": "Validate Payload"}]]},
+    "Validate Payload": {"main": [[{"node": "INEP Placeholder"}]]},
+    "INEP Placeholder": {"main": [[{"node": "Respond to Webhook"}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "tocantins-integrado"}, {"name": "data-collection"}, {"name": "inep"}],
+  "meta": {"instanceId": "n8n-cloud"}
+}

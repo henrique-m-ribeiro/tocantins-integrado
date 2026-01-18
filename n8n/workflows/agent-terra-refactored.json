@@ -1,0 +1,357 @@
+{
+  "name": "Tocantins - Agente TERRA",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent-terra",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-terra",
+      "name": "Webhook TERRA",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "indicator_values"
+        },
+        "returnAll": false,
+        "limit": 100,
+        "where": {
+          "values": [
+            {
+              "column": "indicator_id",
+              "condition": "in",
+              "value": "={{ $json.indicator_ids }}"
+            }
+          ]
+        },
+        "options": {
+          "queryBatching": "transaction"
+        }
+      },
+      "id": "fetch-indicators",
+      "name": "Buscar Indicadores TERRA",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-tocantins",
+          "name": "PostgreSQL Tocantins"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "knowledge_chunks"
+        },
+        "returnAll": false,
+        "limit": 10,
+        "where": {
+          "values": [
+            {
+              "column": "dimensions",
+              "condition": "contains",
+              "value": "TERRA"
+            }
+          ]
+        },
+        "sort": {
+          "values": [
+            {
+              "column": "relevance_score",
+              "direction": "DESC"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-knowledge",
+      "name": "Buscar Base Conhecimento",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-tocantins",
+          "name": "PostgreSQL Tocantins"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "context",
+              "name": "context",
+              "value": "={{ JSON.stringify({ indicators: $('Buscar Indicadores TERRA').all(), knowledge: $('Buscar Base Conhecimento').all() }) }}",
+              "type": "string"
+            },
+            {
+              "id": "query",
+              "name": "query",
+              "value": "={{ $('Webhook TERRA').item.json.query }}",
+              "type": "string"
+            },
+            {
+              "id": "territory_id",
+              "name": "territory_id",
+              "value": "={{ $('Webhook TERRA').item.json.territory_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-context",
+      "name": "Preparar Contexto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-turbo-preview",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 2000
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Você é um agente especialista em análise TERRITORIAL do Tocantins. Sua expertise inclui:\n\n1. **Uso do Solo**: Agricultura, pecuária, áreas urbanas, reservas\n2. **Infraestrutura**: Rodovias, energia elétrica, telecomunicações\n3. **Logística**: Distância a centros, acesso a mercados, escoamento\n4. **Urbanização**: Densidade demográfica, crescimento urbano, planejamento\n5. **Recursos Hídricos**: Bacias hidrográficas, irrigação, abastecimento\n\nAo analisar dados:\n- Considere a vocação territorial de cada município\n- Avalie potenciais de desenvolvimento\n- Identifique gargalos de infraestrutura\n- Analise conectividade e acessibilidade\n- Proponha investimentos estratégicos\n\nSempre estruture sua resposta em JSON com: summary, key_findings[], detailed_analysis, recommendations[], data_sources[]",
+              "role": "system"
+            },
+            {
+              "content": "=Consulta: {{ $json.query }}\n\nTerritório: {{ $json.territory_id }}\n\nDados disponíveis:\n{{ $json.context }}",
+              "role": "user"
+            }
+          ]
+        }
+      },
+      "id": "analyze-terra",
+      "name": "Análise GPT-4 TERRA",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [900, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-api",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "agent",
+              "name": "agent",
+              "value": "TERRA",
+              "type": "string"
+            },
+            {
+              "id": "response",
+              "name": "response",
+              "value": "={{ JSON.parse($json.message.content) }}",
+              "type": "object"
+            },
+            {
+              "id": "timestamp",
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "tokens_used",
+              "name": "tokens_used",
+              "value": "={{ $json.usage?.total_tokens || 0 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-response",
+      "name": "Formatar Resposta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-webhook",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "knowledge_query_log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "query_text": "={{ $('Webhook TERRA').item.json.query }}",
+            "query_embedding": null,
+            "results_returned": "={{ $('Buscar Base Conhecimento').all().length }}",
+            "was_helpful": null,
+            "dimension_context": "TERRA"
+          }
+        },
+        "options": {}
+      },
+      "id": "log-query",
+      "name": "Registrar Consulta",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1120, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-tocantins",
+          "name": "PostgreSQL Tocantins"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook TERRA": {
+      "main": [
+        [
+          {
+            "node": "Buscar Indicadores TERRA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Buscar Base Conhecimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Indicadores TERRA": {
+      "main": [
+        [
+          {
+            "node": "Preparar Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Base Conhecimento": {
+      "main": [
+        [
+          {
+            "node": "Preparar Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Contexto": {
+      "main": [
+        [
+          {
+            "node": "Análise GPT-4 TERRA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Análise GPT-4 TERRA": {
+      "main": [
+        [
+          {
+            "node": "Formatar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Resposta": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Registrar Consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "tocantins-integrado"
+    },
+    {
+      "name": "agentes"
+    },
+    {
+      "name": "terra"
+    }
+  ]
+}
