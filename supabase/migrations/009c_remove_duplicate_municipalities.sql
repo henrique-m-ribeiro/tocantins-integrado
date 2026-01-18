@@ -1,68 +1,103 @@
 -- ============================================
--- Migration 009c: CORREÇÃO - Remover Município Duplicado
+-- Migration 009c: CORREÇÃO - Remover Duplicatas e Recriar Relacionamentos
 -- ============================================
--- Problema: 140 municípios criados em vez de 139
--- Causa: Palmas foi criado pela Migration 009 e novamente pela 009b
--- Solução: Identificar e remover duplicatas
+-- Problema 1: 140 municípios em vez de 139 (duplicata)
+-- Problema 2: Municípios sem relacionamentos com microrregiões
+-- Causa: Migration 009b deletou relacionamentos mas INSERTs falharam
+-- Solução: Remover duplicatas E recriar todos os relacionamentos
 --
 -- Data: 2026-01-18
 -- ============================================
 
 -- ============================================
--- PASSO 1: IDENTIFICAR DUPLICATAS
+-- PASSO 1: DIAGNÓSTICO COMPLETO
 -- ============================================
 
--- Listar municípios duplicados (mesmo ibge_code)
 DO $$
 DECLARE
+    v_total_municipios INTEGER;
+    v_total_microregioes INTEGER;
+    v_total_imediatas INTEGER;
+    v_municipios_sem_micro INTEGER;
+    v_municipios_sem_imediata INTEGER;
+    v_duplicatas INTEGER;
     rec RECORD;
-    v_total_duplicatas INTEGER;
 BEGIN
     RAISE NOTICE '============================================';
-    RAISE NOTICE 'ANÁLISE DE DUPLICATAS';
+    RAISE NOTICE 'DIAGNÓSTICO - Migration 009c';
     RAISE NOTICE '============================================';
+    RAISE NOTICE '';
+
+    -- Contar territórios
+    SELECT COUNT(*) INTO v_total_municipios FROM territories WHERE type = 'municipio';
+    SELECT COUNT(*) INTO v_total_microregioes FROM territories WHERE type = 'microrregiao' AND division_scheme = 'antiga';
+    SELECT COUNT(*) INTO v_total_imediatas FROM territories WHERE type = 'regiao_imediata' AND division_scheme = 'nova';
+
+    RAISE NOTICE '📊 CONTADORES:';
+    RAISE NOTICE '  Municípios: % (esperado: 139)', v_total_municipios;
+    RAISE NOTICE '  Microrregiões: % (esperado: 8)', v_total_microregioes;
+    RAISE NOTICE '  Regiões Imediatas: % (esperado: 11)', v_total_imediatas;
+    RAISE NOTICE '';
 
     -- Contar duplicatas
-    SELECT COUNT(*) INTO v_total_duplicatas
+    SELECT COUNT(*) INTO v_duplicatas
     FROM (
-        SELECT ibge_code, COUNT(*) as qtd
+        SELECT ibge_code
         FROM territories
         WHERE type = 'municipio'
         GROUP BY ibge_code
         HAVING COUNT(*) > 1
-    ) duplicatas;
+    ) dup;
 
-    RAISE NOTICE 'Total de códigos IBGE duplicados: %', v_total_duplicatas;
+    RAISE NOTICE '🔍 DUPLICATAS:';
+    RAISE NOTICE '  Total de códigos IBGE duplicados: % (esperado: 0)', v_duplicatas;
+
+    -- Listar duplicatas se existirem
+    IF v_duplicatas > 0 THEN
+        FOR rec IN
+            SELECT ibge_code, name, COUNT(*) as qtd
+            FROM territories
+            WHERE type = 'municipio'
+            GROUP BY ibge_code, name
+            HAVING COUNT(*) > 1
+        LOOP
+            RAISE NOTICE '    ⚠️  % (IBGE: %) - % registros', rec.name, rec.ibge_code, rec.qtd;
+        END LOOP;
+    END IF;
     RAISE NOTICE '';
 
-    -- Listar cada duplicata com detalhes
-    FOR rec IN
-        SELECT
-            t.ibge_code,
-            t.name,
-            COUNT(*) as quantidade,
-            string_agg(t.id::text, ', ') as ids
-        FROM territories t
-        WHERE t.type = 'municipio'
-        GROUP BY t.ibge_code, t.name
-        HAVING COUNT(*) > 1
-    LOOP
-        RAISE NOTICE 'DUPLICATA ENCONTRADA:';
-        RAISE NOTICE '  IBGE Code: %', rec.ibge_code;
-        RAISE NOTICE '  Nome: %', rec.name;
-        RAISE NOTICE '  Quantidade: %', rec.quantidade;
-        RAISE NOTICE '  IDs: %', rec.ids;
-        RAISE NOTICE '';
-    END LOOP;
+    -- Contar municípios sem relacionamentos
+    SELECT COUNT(*) INTO v_municipios_sem_micro
+    FROM territories t
+    WHERE t.type = 'municipio'
+      AND NOT EXISTS (
+          SELECT 1 FROM territory_relationships tr
+          WHERE tr.child_territory_id = t.id
+            AND tr.division_scheme = 'antiga'
+      );
+
+    SELECT COUNT(*) INTO v_municipios_sem_imediata
+    FROM territories t
+    WHERE t.type = 'municipio'
+      AND NOT EXISTS (
+          SELECT 1 FROM territory_relationships tr
+          WHERE tr.child_territory_id = t.id
+            AND tr.division_scheme = 'nova'
+      );
+
+    RAISE NOTICE '🔗 RELACIONAMENTOS:';
+    RAISE NOTICE '  Municípios sem microrregião (antiga): % (esperado: 0)', v_municipios_sem_micro;
+    RAISE NOTICE '  Municípios sem região imediata (nova): % (esperado: 0)', v_municipios_sem_imediata;
+    RAISE NOTICE '';
+    RAISE NOTICE '============================================';
+    RAISE NOTICE '';
 END $$;
 
 -- ============================================
 -- PASSO 2: REMOVER DUPLICATAS
 -- ============================================
 
--- Estratégia: Manter o registro mais antigo (menor created_at) e deletar os demais
--- Isso preserva relacionamentos que possam existir no registro original
-
+-- Manter o registro mais antigo, deletar os demais
 WITH duplicados AS (
     SELECT
         ibge_code,
@@ -76,7 +111,6 @@ WITH duplicados AS (
     HAVING COUNT(*) > 1
 ),
 ids_para_deletar AS (
-    -- Pegar todos os IDs exceto o primeiro (mais antigo)
     SELECT
         UNNEST(ids_ordenados[2:]) as id_deletar,
         ibge_code,
@@ -87,13 +121,17 @@ DELETE FROM territories
 WHERE id IN (SELECT id_deletar FROM ids_para_deletar);
 
 -- ============================================
--- PASSO 3: GARANTIR RELACIONAMENTOS CORRETOS
+-- PASSO 3: RECRIAR RELACIONAMENTOS (Divisão Antiga)
 -- ============================================
 
--- Como deletamos municípios duplicados, precisamos garantir que
--- TODOS os 139 municípios tenham relacionamentos nas duas divisões
+-- 3.1. Limpar relacionamentos existentes para municípios
+DELETE FROM territory_relationships
+WHERE division_scheme = 'antiga'
+  AND child_territory_id IN (
+      SELECT id FROM territories WHERE type = 'municipio'
+  );
 
--- 3.1. Verificar e criar relacionamentos faltantes (divisão antiga)
+-- 3.2. Inserir todos os 139 relacionamentos: município → microrregião
 INSERT INTO territory_relationships (parent_territory_id, child_territory_id, relationship_type, division_scheme)
 SELECT
     t_micro.id as parent_id,
@@ -138,15 +176,20 @@ FROM (VALUES
     ('1721307', '17003'), ('1722081', '17002'), ('1722107', '17002')
 ) AS mapeamento(municipio_ibge, microrregiao_ibge)
 JOIN territories t_muni ON t_muni.ibge_code = mapeamento.municipio_ibge AND t_muni.type = 'municipio'
-JOIN territories t_micro ON t_micro.ibge_code = mapeamento.microrregiao_ibge AND t_micro.type = 'microrregiao' AND t_micro.division_scheme = 'antiga'
-WHERE NOT EXISTS (
-    SELECT 1 FROM territory_relationships tr
-    WHERE tr.child_territory_id = t_muni.id
-      AND tr.parent_territory_id = t_micro.id
-      AND tr.division_scheme = 'antiga'
-);
+JOIN territories t_micro ON t_micro.ibge_code = mapeamento.microrregiao_ibge AND t_micro.type = 'microrregiao' AND t_micro.division_scheme = 'antiga';
 
--- 3.2. Verificar e criar relacionamentos faltantes (divisão nova)
+-- ============================================
+-- PASSO 4: RECRIAR RELACIONAMENTOS (Divisão Nova)
+-- ============================================
+
+-- 4.1. Limpar relacionamentos existentes para municípios
+DELETE FROM territory_relationships
+WHERE division_scheme = 'nova'
+  AND child_territory_id IN (
+      SELECT id FROM territories WHERE type = 'municipio'
+  );
+
+-- 4.2. Inserir todos os 139 relacionamentos: município → região imediata
 INSERT INTO territory_relationships (parent_territory_id, child_territory_id, relationship_type, division_scheme)
 SELECT
     t_imediata.id as parent_id,
@@ -191,16 +234,10 @@ FROM (VALUES
     ('1721307', '170007'), ('1722081', '170005'), ('1722107', '170005')
 ) AS mapeamento(municipio_ibge, regiao_imediata_ibge)
 JOIN territories t_muni ON t_muni.ibge_code = mapeamento.municipio_ibge AND t_muni.type = 'municipio'
-JOIN territories t_imediata ON t_imediata.ibge_code = mapeamento.regiao_imediata_ibge AND t_imediata.type = 'regiao_imediata' AND t_imediata.division_scheme = 'nova'
-WHERE NOT EXISTS (
-    SELECT 1 FROM territory_relationships tr
-    WHERE tr.child_territory_id = t_muni.id
-      AND tr.parent_territory_id = t_imediata.id
-      AND tr.division_scheme = 'nova'
-);
+JOIN territories t_imediata ON t_imediata.ibge_code = mapeamento.regiao_imediata_ibge AND t_imediata.type = 'regiao_imediata' AND t_imediata.division_scheme = 'nova';
 
 -- ============================================
--- PASSO 4: VALIDAÇÃO FINAL
+-- PASSO 5: VALIDAÇÃO FINAL
 -- ============================================
 
 DO $$
@@ -208,13 +245,15 @@ DECLARE
     v_total_municipios INTEGER;
     v_municipios_sem_micro INTEGER;
     v_municipios_sem_imediata INTEGER;
-    v_total_duplicatas INTEGER;
+    v_duplicatas INTEGER;
+    v_rels_antiga INTEGER;
+    v_rels_nova INTEGER;
 BEGIN
     -- Contar municípios
     SELECT COUNT(*) INTO v_total_municipios FROM territories WHERE type = 'municipio';
 
-    -- Contar duplicatas restantes
-    SELECT COUNT(*) INTO v_total_duplicatas
+    -- Contar duplicatas
+    SELECT COUNT(*) INTO v_duplicatas
     FROM (
         SELECT ibge_code
         FROM territories
@@ -223,7 +262,18 @@ BEGIN
         HAVING COUNT(*) > 1
     ) dup;
 
-    -- Verificar municípios sem microrregião (divisão antiga)
+    -- Contar relacionamentos criados
+    SELECT COUNT(*) INTO v_rels_antiga
+    FROM territory_relationships
+    WHERE division_scheme = 'antiga'
+      AND child_territory_id IN (SELECT id FROM territories WHERE type = 'municipio');
+
+    SELECT COUNT(*) INTO v_rels_nova
+    FROM territory_relationships
+    WHERE division_scheme = 'nova'
+      AND child_territory_id IN (SELECT id FROM territories WHERE type = 'municipio');
+
+    -- Verificar municípios sem relacionamentos
     SELECT COUNT(*) INTO v_municipios_sem_micro
     FROM territories t
     WHERE t.type = 'municipio'
@@ -233,7 +283,6 @@ BEGIN
             AND tr.division_scheme = 'antiga'
       );
 
-    -- Verificar municípios sem região imediata (divisão nova)
     SELECT COUNT(*) INTO v_municipios_sem_imediata
     FROM territories t
     WHERE t.type = 'municipio'
@@ -243,26 +292,53 @@ BEGIN
             AND tr.division_scheme = 'nova'
       );
 
-    -- Relatório
+    -- Relatório final
     RAISE NOTICE '============================================';
-    RAISE NOTICE 'VALIDAÇÃO FINAL - Migration 009c';
+    RAISE NOTICE '✅ VALIDAÇÃO FINAL - Migration 009c';
     RAISE NOTICE '============================================';
-    RAISE NOTICE 'Total de municípios: % (esperado: 139)', v_total_municipios;
-    RAISE NOTICE 'Duplicatas restantes: % (esperado: 0)', v_total_duplicatas;
-    RAISE NOTICE 'Municípios sem microrregião (antiga): % (esperado: 0)', v_municipios_sem_micro;
-    RAISE NOTICE 'Municípios sem região imediata (nova): % (esperado: 0)', v_municipios_sem_imediata;
+    RAISE NOTICE '';
+    RAISE NOTICE '📊 TERRITÓRIOS:';
+    RAISE NOTICE '  Municípios: % (esperado: 139)', v_total_municipios;
+    RAISE NOTICE '  Duplicatas: % (esperado: 0)', v_duplicatas;
+    RAISE NOTICE '';
+    RAISE NOTICE '🔗 RELACIONAMENTOS CRIADOS:';
+    RAISE NOTICE '  Divisão Antiga: % (esperado: 139)', v_rels_antiga;
+    RAISE NOTICE '  Divisão Nova: % (esperado: 139)', v_rels_nova;
+    RAISE NOTICE '';
+    RAISE NOTICE '🔍 INTEGRIDADE:';
+    RAISE NOTICE '  Municípios sem microrregião: % (esperado: 0)', v_municipios_sem_micro;
+    RAISE NOTICE '  Municípios sem região imediata: % (esperado: 0)', v_municipios_sem_imediata;
+    RAISE NOTICE '';
     RAISE NOTICE '============================================';
 
-    IF v_total_municipios = 139 AND v_total_duplicatas = 0 AND v_municipios_sem_micro = 0 AND v_municipios_sem_imediata = 0 THEN
-        RAISE NOTICE '✅ CORREÇÃO 009c CONCLUÍDA COM SUCESSO!';
+    IF v_total_municipios = 139 AND v_duplicatas = 0 AND
+       v_municipios_sem_micro = 0 AND v_municipios_sem_imediata = 0 AND
+       v_rels_antiga = 139 AND v_rels_nova = 139 THEN
+        RAISE NOTICE '🎉 MIGRATION 009c CONCLUÍDA COM SUCESSO!';
         RAISE NOTICE '';
-        RAISE NOTICE 'Sistema pronto para uso:';
-        RAISE NOTICE '  - 139 municípios únicos';
-        RAISE NOTICE '  - Todos com relacionamentos nas 2 divisões';
-        RAISE NOTICE '  - Nenhuma duplicata';
+        RAISE NOTICE '✅ Sistema Territorial Completo:';
+        RAISE NOTICE '  • 139 municípios únicos';
+        RAISE NOTICE '  • 139 relacionamentos (divisão antiga)';
+        RAISE NOTICE '  • 139 relacionamentos (divisão nova)';
+        RAISE NOTICE '  • 0 duplicatas';
+        RAISE NOTICE '  • 0 registros órfãos';
+        RAISE NOTICE '';
+        RAISE NOTICE '📋 Próximos passos:';
+        RAISE NOTICE '  1. SELECT * FROM v_hierarchy_antiga LIMIT 10;';
+        RAISE NOTICE '  2. SELECT * FROM v_hierarchy_nova LIMIT 10;';
+        RAISE NOTICE '  3. Começar coleta de dados com workflows n8n';
+        RAISE NOTICE '';
     ELSE
-        RAISE WARNING '⚠️  Ainda há problemas. Verifique os números acima.';
+        RAISE WARNING '⚠️  Há problemas restantes. Verifique os números acima.';
+
+        -- Diagnóstico adicional se houver problemas
+        IF v_municipios_sem_micro > 0 THEN
+            RAISE WARNING 'Municípios sem microrregião detectados. Verifique se as microrregiões existem:';
+            RAISE WARNING '  SELECT ibge_code, name FROM territories WHERE type = ''microrregiao'';';
+        END IF;
     END IF;
+
+    RAISE NOTICE '============================================';
 END $$;
 
 -- ============================================
