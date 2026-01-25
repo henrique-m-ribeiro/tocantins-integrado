@@ -1,0 +1,53 @@
+{
+  "name": "Data Collection - MapBiomas",
+  "nodes": [
+    {
+      "parameters": {"httpMethod": "POST", "path": "data-collection-mapbiomas", "responseMode": "responseNode"},
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Recebe payload do orquestrador com indicadores MapBiomas (ambientais)\nNOVO SCHEMA: Usa territory_id em vez de municipality_id"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const payload = $json.body || $json;\nconsole.log(`[MapBiomas] Iniciando coleta de ${payload.indicators.length} indicadores`);\nreturn [{...payload, start_time: new Date().toISOString()}];"
+      },
+      "id": "validate-payload",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// MapBiomas API: https://api.mapbiomas.org/\n// Requer autenticação (token)\nconsole.log('[MapBiomas] ⚠️  MapBiomas API requer token de autenticação');\nconsole.log('[MapBiomas] Indicadores recebidos:', $json.indicators.map(i => i.code));\n\n// IMPORTANTE: Quando implementar, use o NOVO SCHEMA DE TERRITÓRIOS\n// Exemplo de coleta e INSERT:\n//\n// 1. Buscar territórios:\n//    SELECT id, ibge_code, name FROM territories WHERE type = 'municipio'\n//\n// 2. Para cada território, chamar API MapBiomas com ibge_code:\n//    GET https://api.mapbiomas.org/coverage?territory={ibge_code}\n//\n// 3. Inserir dados com territory_id:\n//    INSERT INTO indicator_values (\n//      indicator_id,\n//      territory_id,          -- NOVO: usar territory_id (UUID) do passo 1\n//      year,\n//      value,                 -- Ex: % cobertura florestal\n//      aggregation_method,    -- NOVO: 'raw' para dados brutos da API\n//      is_aggregated,         -- NOVO: false para dados municipais diretos\n//      data_quality,          -- 'official' para dados MapBiomas\n//      notes\n//    ) VALUES (...)\n//    ON CONFLICT (indicator_id, territory_id, year, month)\n//    DO UPDATE SET ...\n\nconst summary = {\n  source: 'MapBiomas',\n  status: 'not_implemented',\n  message: 'MapBiomas API requires authentication token',\n  indicators_received: $json.indicators.length,\n  schema_version: 'territories_v009',\n  next_steps: [\n    'Register at MapBiomas platform',\n    'Obtain API token',\n    'Query territories table for ibge_codes',\n    'Implement authenticated API calls using ibge_code',\n    'Process coverage data and insert with territory_id',\n    'Use aggregation_method=raw and is_aggregated=false for municipal data'\n  ]\n};\n\nreturn [summary];"
+      },
+      "id": "mapbiomas-placeholder",
+      "name": "MapBiomas Placeholder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "notes": "Placeholder: MapBiomas requer token de API\nQUANDO IMPLEMENTAR: usar territories table com type='municipio' e territory_id"
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={{ JSON.stringify($json) }}"},
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {"main": [[{"node": "Validate Payload"}]]},
+    "Validate Payload": {"main": [[{"node": "MapBiomas Placeholder"}]]},
+    "MapBiomas Placeholder": {"main": [[{"node": "Respond to Webhook"}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "tocantins-integrado"}, {"name": "data-collection"}, {"name": "mapbiomas"}],
+  "meta": {"instanceId": "n8n-cloud"}
+}

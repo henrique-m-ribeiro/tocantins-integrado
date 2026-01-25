@@ -1,0 +1,229 @@
+{
+  "name": "Tocantins Integrado - Agente ECON",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent-econ",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  iv.*, \n  id.code, id.name as indicator_name, id.unit, id.higher_is_better,\n  ic.name as category_name,\n  t.name as territory_name,\n  t_parent.name as parent_territory_name\nFROM indicator_values iv\nJOIN indicator_definitions id ON iv.indicator_id = id.id\nJOIN indicator_categories ic ON id.category_id = ic.id\nJOIN territories t ON iv.territory_id = t.id\nLEFT JOIN territory_relationships tr ON t.id = tr.child_territory_id AND tr.division_scheme = 'antiga'\nLEFT JOIN territories t_parent ON tr.parent_territory_id = t_parent.id AND t_parent.type = 'microrregiao'\nWHERE ic.dimension = 'ECON'\n  AND ($1::uuid IS NULL OR iv.territory_id = $1::uuid)\nORDER BY ic.display_order, id.name\nLIMIT 50",
+        "options": {}
+      },
+      "id": "fetch-indicators",
+      "name": "Buscar Indicadores ECON",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT content, metadata FROM knowledge_chunks kc\nJOIN knowledge_documents kd ON kc.document_id = kd.id\nWHERE 'ECON' = ANY(kd.dimensions)\n  AND kd.is_active = true\nORDER BY kc.created_at DESC\nLIMIT 5",
+        "options": {}
+      },
+      "id": "fetch-knowledge",
+      "name": "Buscar Base Conhecimento",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [440, 480],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar contexto para o LLM\nconst indicators = $('Buscar Indicadores ECON').all();\nconst knowledge = $('Buscar Base Conhecimento').all();\nconst task = $('Webhook Trigger').first().json.task;\nconst context = JSON.parse($('Webhook Trigger').first().json.context || '{}');\n\n// Formatar indicadores\nconst indicatorsText = indicators.map(i => \n  `- ${i.json.indicator_name}: ${i.json.value} ${i.json.unit} (${i.json.territory_name}, ${i.json.year})`\n).join('\\n');\n\n// Formatar conhecimento contextual\nconst knowledgeText = knowledge.map(k => k.json.content).join('\\n---\\n');\n\nreturn {\n  task,\n  context,\n  indicatorsText,\n  knowledgeText,\n  indicatorCount: indicators.length\n};"
+      },
+      "id": "prepare-context",
+      "name": "Preparar Contexto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 380]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-turbo-preview",
+        "messages": {
+          "values": [
+            {
+              "content": "Você é um especialista em economia regional e finanças públicas municipais do estado do Tocantins, Brasil.\n\nSua função é analisar indicadores econômicos de municípios tocantinenses e fornecer insights acionáveis para tomadores de decisão política.\n\nCONTEXTO DO TOCANTINS:\n- Estado mais novo do Brasil (1988), no Norte do país\n- Economia baseada em agropecuária (soja, milho, pecuária) e serviços\n- 139 municípios com grande heterogeneidade econômica\n- Capital Palmas concentra grande parte do PIB de serviços\n- Polo agroindustrial no sul (Gurupi) e pecuária extensiva\n- Dependência significativa de transferências federais (FPM)\n\nDIRETRIZES DE ANÁLISE:\n1. Sempre contextualize os números com comparações (estado, microrregião, Brasil)\n2. Identifique as principais vocações econômicas do município\n3. Avalie a dependência de transferências vs. receita própria\n4. Destaque oportunidades de desenvolvimento econômico\n5. Considere o contexto regional\n\nRESPONDA EM JSON:\n{\n  \"summary\": \"Resumo executivo em 2-3 parágrafos\",\n  \"key_findings\": [\"Achado 1\", \"Achado 2\", \"Achado 3\"],\n  \"strengths\": [\"Ponto forte 1\", \"Ponto forte 2\"],\n  \"weaknesses\": [\"Desafio 1\", \"Desafio 2\"],\n  \"recommendations\": [\"Recomendação 1\", \"Recomendação 2\"],\n  \"economic_profile\": {\n    \"main_sector\": \"Setor dominante\",\n    \"fiscal_health\": \"Boa/Regular/Crítica\",\n    \"growth_potential\": \"Alto/Médio/Baixo\"\n  }\n}",
+              "role": "system"
+            },
+            {
+              "content": "TAREFA: {{ $json.task }}\n\nINDICADORES DISPONÍVEIS:\n{{ $json.indicatorsText }}\n\nCONHECIMENTO CONTEXTUAL:\n{{ $json.knowledgeText }}\n\nPor favor, analise os dados econômicos e forneça uma análise completa.",
+              "role": "user"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3,
+          "responseFormat": "json_object",
+          "maxTokens": 2000
+        }
+      },
+      "id": "analyze-llm",
+      "name": "Analisar com LLM",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [880, 380],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear resposta e formatar saída\nconst response = JSON.parse($input.first().json.message.content);\nconst context = $('Preparar Contexto').first().json;\n\nreturn {\n  dimension: 'ECON',\n  status: 'completed',\n  analysis: response,\n  metadata: {\n    indicators_analyzed: context.indicatorCount,\n    model_used: 'gpt-4-turbo-preview'\n  }\n};"
+      },
+      "id": "format-response",
+      "name": "Formatar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 380]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "agent_execution_logs",
+        "columns": "orchestrator_request_id, dimension, status, output_analysis, completed_at",
+        "options": {}
+      },
+      "id": "log-execution",
+      "name": "Registrar Execução",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [1100, 560],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-webhook",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1320, 380]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Buscar Indicadores ECON",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Buscar Base Conhecimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Indicadores ECON": {
+      "main": [
+        [
+          {
+            "node": "Preparar Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Base Conhecimento": {
+      "main": [
+        [
+          {
+            "node": "Preparar Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Contexto": {
+      "main": [
+        [
+          {
+            "node": "Analisar com LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisar com LLM": {
+      "main": [
+        [
+          {
+            "node": "Formatar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Resposta": {
+      "main": [
+        [
+          {
+            "node": "Registrar Execução",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "tocantins-integrado"
+    },
+    {
+      "name": "agent"
+    },
+    {
+      "name": "econ"
+    }
+  ]
+}
